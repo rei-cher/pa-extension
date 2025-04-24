@@ -3,12 +3,13 @@
     "name": "Prior Authorization Autoupload",
     "version": "0.1",
     "description": "Auto dowload, rename, and upload faxed PA from covermymeds into emd.md",
+    "permissions": ["tabs", "cookies"],
+    "host_permissions": ["https://dashboard.covermymeds.com/"],
     "background": {
-        "cookie-sript": ["cmm-cookie.js"]
+        "service_worker": "background.js"
     },
-    "permissions": ["https://https://dashboard.covermymeds.com", "activeTab"],
-    "browser_action": {
-        "default_icon": "",
-        "default_popup": "popup.html"
+    "action": {
+        "default_popup": "popup.html",
+        "default_icon": "ext_icon.png"
     }
 }
