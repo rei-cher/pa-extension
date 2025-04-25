@@ -1,34 +1,52 @@
-// cookie name: cmm_production_session
-async function getCookie(name, callback) {
-    chrome.cookies.get({
-        "url" : "https://dashboard.covermymeds.com",
-        "name" : name
-    },
-    function(data){
-        callback(data);
-    });
+function getCookie(tabUrl, callback) {
+    chrome.cookies.get(
+        { url: tabUrl, name: "cmm_production_session" },
+        (cookie) => {
+            if (chrome.runtime.lastError) {
+                console.error("Cookie API error:", chrome.runtime.lastError);
+                return callback(null);
+            }
+            callback(cookie ? cookie.value : null);
+        }
+    );
 }
 
-chrome.tabs.onUpdated.addListener((tab) => {
-    if (tab.url && tab.url.includes("covermymeds.com/v2/requests")) {
-        const pa_id = tab.url.split("/").pop();
-        var token = ""
-        getCookie("cmm_production_session", function(cookieData){
-            token = cookieData.value
-        });
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    // const url = changeInfo.url || tab.url;
+    // if (!url || !url.includes("/v2/requests")) return;
 
-        console.log(`Parameters for sending in the message:\nToken: ${token}\nPA ID: ${pa_id}`);
+    if (!changeInfo.url) return;
 
-        if (token && pa_id) {
-            try{
-                chrome.runtime.sendMessage({
-                    token: token,
-                    pa_id: pa_id
-                });
-            }
-            catch(error){
-                console.error(`Error sending the message: ${error}`);
-            }
+    const url = changeInfo.url;
+    if (!url.includes("/v2/requests")) return;
+  
+    const pa_id = url.split("/").pop();
+
+    getCookie(url, (token) => {
+        if (!token) {
+            console.error("No session token found for", url);
+            return;
         }
-    }
+
+        console.log(
+            `Parameters for sending in the message:\n  Token: ${token}\n  PA ID: ${pa_id}`
+        );
+
+        if (typeof getPatientInfo === 'function'){
+            getPatientInfo(pa_id)
+                .then(data => {
+                    console.log(`PA data: ${data}`);
+                    console.log(`PT drug: ${data.drug}`);
+                    console.log(`PT first name: ${data.patient_fname}`);
+                    console.log(`PT last name: ${data.patient_lname}`);
+                    console.log(`PT dob: ${data.sections[1].rows[1].questions[0].answer_text}`);
+                })
+                .catch(error => {
+                    console.error(`Error fetching patient info: ${error}`)
+                });
+        }
+        else {
+            console.error("getPatientInfo() not defined")
+        }
+    });
 });

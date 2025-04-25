@@ -1,27 +1,37 @@
-function getPatientInfo(pa_id, token){
-    const url = `https://dashboard.covermymeds.com/api/requests/${pa_id}`
-    fetch(url, {
+async function getPatientInfo(pa_id, token) {
+    console.log(`Getting patient info with ID - ${pa_id}`)
+    const url = `https://dashboard.covermymeds.com/api/requests/${pa_id}?`;
+  
+    try {
+      const resp = await fetch(url, {
         method: 'GET',
-        headers : {
-            "Content-Type": "application/json",
-            "Cookie": token
+        credentials: 'include',
+        headers: {
+          'Accept': 'application/json',
+          'Cookie': token
         }
-    })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error (`Https error. Status: ${response.status}`);
-        }
-        return response.json();
-    })
-    .catch(error => {
-        console.error(`Error fetching data: ${error}`)
-    });
-}
-
-chrome.runtime.onMessage.addListener((obj, sender, response) => {
-    console.log("Message recieved")
-    const { token, pa_id} = obj;
-    if (token && pa_id) {
-        getPatientInfo(pa_id, token);
+      });
+  
+      if (!resp.ok) {
+        throw new Error(`HTTP ${resp.status}`);
+      }
+  
+      const data = await resp.json();
+      console.log('PA data:', data);
+      return data;
+    } catch (err) {
+      console.error('Error fetching PA info:', err);
+      throw err;
     }
-});
+}
+  
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+    const { token, pa_id } = msg;
+    if (!(pa_id && token)) return;
+  
+    getPatientInfo(pa_id, token)
+      .then(data => sendResponse({ success: true, data }))
+      .catch(err => sendResponse({ success: false, error: err.message }));
+  
+    return true;
+  });
