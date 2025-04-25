@@ -1,3 +1,16 @@
+function getCookie(tabUrl, callback) {
+    chrome.cookies.get(
+        { url: tabUrl, name: "cmm_production_session" },
+        (cookie) => {
+            if (chrome.runtime.lastError) {
+                console.error("Cookie API error:", chrome.runtime.lastError);
+                return callback(null);
+            }
+            callback(cookie ? cookie.value : null);
+        }
+    );
+}
+
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   // only when the page is fully loaded…
   if (changeInfo.status !== 'complete') return;
