@@ -24,14 +24,3 @@ async function getPatientInfo(pa_id, token) {
       throw err;
     }
 }
-  
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-    const { token, pa_id } = msg;
-    if (!(pa_id && token)) return;
-  
-    getPatientInfo(pa_id, token)
-      .then(data => sendResponse({ success: true, data }))
-      .catch(err => sendResponse({ success: false, error: err.message }));
-  
-    return true;
-  });
