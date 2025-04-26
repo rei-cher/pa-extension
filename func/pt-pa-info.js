@@ -1,4 +1,21 @@
-async function getPatientInfo(pa_id, token) {
+// in json look for 'Date of Birth' to extract patient's dob
+function extractPatientDOB(data) {
+  if (data.patient_dob) return data.patient_dob;
+
+  for (const section of data.sections || []) {
+    for (const row of section.rows || []) {
+      for (const q of row.questions || []) {
+        const prompt = q.question_text || q.label || '';
+        if (/date of birth/i.test(prompt)) {
+          return q.answer_text ?? q.answer ?? null;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+export async function getPatientInfo(pa_id, token) {
     console.log(`Getting patient info with ID - ${pa_id}`)
     const url = `https://dashboard.covermymeds.com/api/requests/${pa_id}?`;
   
@@ -18,9 +35,19 @@ async function getPatientInfo(pa_id, token) {
   
       const data = await resp.json();
       console.log('PA data:', data);
-      return data;
+
+      // return drug, patient fname, lname, and dob
+      return {
+        patient_fname: data.patient_fname,
+        patient_lname: data.patient_lname,
+        patient_dob: extractPatientDOB(data),
+        drug: data.drug
+      };
+      
     } catch (err) {
       console.error('Error fetching PA info:', err);
       throw err;
     }
 }
+
+self.getPatientInfo = getPatientInfo;

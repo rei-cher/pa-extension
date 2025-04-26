@@ -12,9 +12,13 @@
         "webRequest",
         "webNavigation"
     ],
-    "host_permissions": ["https://dashboard.covermymeds.com/*"],
+    "host_permissions": [
+        "*://portal-services.covermymeds.com/*",
+        "*://dashboard.covermymeds.com/*"
+    ],
     "background": {
-        "service_worker": "background.js"
+        "service_worker": "background.js",
+        "type": "module"
     },
     "action": {
         

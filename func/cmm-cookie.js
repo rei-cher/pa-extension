@@ -1,39 +1,14 @@
-function getCookie(tabUrl, callback) {
-    chrome.cookies.get(
-        { url: tabUrl, name: "cmm_production_session" },
-        (cookie) => {
-            if (chrome.runtime.lastError) {
-                console.error("Cookie API error:", chrome.runtime.lastError);
-                return callback(null);
+export function getCookie(tabUrl) {
+    return new Promise((resolve, reject) => {
+        chrome.cookies.get(
+            { url: tabUrl, name: "cmm_production_session" },
+            (cookie) => {
+                if (chrome.runtime.lastError) {
+                    console.error("Cookie API error:", chrome.runtime.lastError);
+                    return reject(chrome.runtime.lastError);
+                }
+                resolve(cookie ? cookie.value : null);
             }
-            callback(cookie ? cookie.value : null);
-        }
-    );
+        );
+    });
 }
-
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  // only when the page is fully loaded…
-  if (changeInfo.status !== 'complete') return;
-
-  const url = tab.url;
-  if (!url.includes('/v2/requests/')) return;
-
-  const pa_id = url.split('/').pop();
-
-  getCookie(url, token => {
-    if (!token) return console.error('No session token for', url);
-
-    if (typeof getPatientInfo !== 'function') {
-      return console.error('getPatientInfo() not defined');
-    }
-
-    getPatientInfo(pa_id)
-      .then(data => {
-        downloadPA(pa_id,
-                   data.patient_fname,
-                   data.patient_lname,
-                   data.drug.replaceAll(' ', '-'));
-      })
-      .catch(err => console.error('Error fetching PA info:', err));
-  });
-});
