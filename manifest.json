@@ -14,7 +14,8 @@
     ],
     "host_permissions": [
         "*://portal-services.covermymeds.com/*",
-        "*://dashboard.covermymeds.com/*"
+        "*://dashboard.covermymeds.com/*",
+        "*://khasak.ema.md/ema/*"
     ],
     "background": {
         "service_worker": "background.js",

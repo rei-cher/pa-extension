@@ -1,6 +1,7 @@
 import { getCookie } from "./func/cmm-cookie.js";
 import { getPatientInfo } from "./func/pt-pa-info.js";
 import { downloadPA } from "./func/pa-downloader.js";
+import { findEmaPatient } from "./func/pt-ema.js";
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     // wait until the request page is fully loaded
@@ -14,7 +15,8 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     getCookie(url)
         .then(token => {
             if (!token) throw new Error(`No session token for ${url}`);
-            return getPatientInfo(pa_id, token);
+            // return getPatientInfo(pa_id, token);
+            return getPatientInfo(pa_id);
         })
         .then(({ patient_fname, patient_lname, patient_dob, drug}) => {
             // format the values
@@ -28,6 +30,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
             // invoking downloadPA
             // downloadPA(pa_id, patient_fname, patient_lname, medSafe);
+            findEmaPatient(patient_dob, patient_fname, patient_lname);
         })
         .catch(error => console.error(`PA flow error: ${error}`));
 });
