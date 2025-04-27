@@ -15,7 +15,7 @@ function extractPatientDOB(data) {
   return null;
 }
 
-export async function getPatientInfo(pa_id, token) {
+export async function getPatientInfo(pa_id) {
     console.log(`Getting patient info with ID - ${pa_id}`)
     const url = `https://dashboard.covermymeds.com/api/requests/${pa_id}?`;
   
@@ -24,8 +24,7 @@ export async function getPatientInfo(pa_id, token) {
         method: 'GET',
         credentials: 'include',
         headers: {
-          'Accept': 'application/json',
-          'Cookie': token
+          'Accept': 'application/json'
         }
       });
   
@@ -44,9 +43,10 @@ export async function getPatientInfo(pa_id, token) {
         drug: data.drug
       };
       
-    } catch (err) {
-      console.error('Error fetching PA info:', err);
-      throw err;
+    } 
+    catch (error) {
+      console.error('Error fetching PA info:', error);
+      throw error;
     }
 }
 
