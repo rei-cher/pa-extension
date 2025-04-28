@@ -47,79 +47,79 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
             const id = patientArr[0].id;
 
             // Convert the PDF File to Base64
-            const b64 = await fileToBase64(file);
+            // const b64 = await fileToBase64(file);
 
-            // Find the EMA tab (where the user is logged in to khasak.ema.md)
-            const emaTabs = await chrome.tabs.query({ url: "*://khasak.ema.md/*" });
-            if (!emaTabs.length) throw new Error("Could not find an open EMA tab");
-            const emaTabId = emaTabs[0].id;
+            // // Find the EMA tab (where the user is logged in to khasak.ema.md)
+            // const emaTabs = await chrome.tabs.query({ url: "*://khasak.ema.md/*" });
+            // if (!emaTabs.length) throw new Error("Could not find an open EMA tab");
+            // const emaTabId = emaTabs[0].id;
 
-            await chrome.scripting.executeScript({
-                target: { tabId: emaTabId },
-                world: "MAIN",
-                func: async ({ id, patient_lname, patient_fname, drug, b64 }) => {
-                    // Reconstruct the PDF Blob & File
-                    const blob = await (await fetch(`data:application/pdf;base64,${b64}`)).blob();
-                    const pdfFile = new File(
-                        [blob],
-                        `${patient_fname}-${patient_lname}-${drug}.pdf`,
-                        { type: "application/pdf" }
-                    );
+            // await chrome.scripting.executeScript({
+            //     target: { tabId: emaTabId },
+            //     world: "MAIN",
+            //     func: async ({ id, patient_lname, patient_fname, drug, b64 }) => {
+            //         // Reconstruct the PDF Blob & File
+            //         const blob = await (await fetch(`data:application/pdf;base64,${b64}`)).blob();
+            //         const pdfFile = new File(
+            //             [blob],
+            //             `${patient_fname}-${patient_lname}-${drug}.pdf`,
+            //             { type: "application/pdf" }
+            //         );
 
-                    // Build the DTO and FormData
-                    const dto = [{
-                        patient: {
-                            id: String(id),
-                            lastName: patient_lname,
-                            firstName: patient_fname
-                        },
-                        additionalInfo: {
-                            performedDate: new Date().toISOString()
-                        },
-                        fileName: pdfFile.name,
-                        title: `${drug} pa submitted: ${new Date().toLocaleDateString()}`
-                    }];
+            //         // Build the DTO and FormData
+            //         const dto = [{
+            //             patient: {
+            //                 id: String(id),
+            //                 lastName: patient_lname,
+            //                 firstName: patient_fname
+            //             },
+            //             additionalInfo: {
+            //                 performedDate: new Date().toISOString()
+            //             },
+            //             fileName: pdfFile.name,
+            //             title: `${drug} pa submitted: ${new Date().toLocaleDateString()}`
+            //         }];
 
-                    const formData = new FormData();
-                    formData.append("dtoList", JSON.stringify(dto));
-                    formData.append("files", pdfFile, pdfFile.name);
+            //         const formData = new FormData();
+            //         formData.append("dtoList", JSON.stringify(dto));
+            //         formData.append("files", pdfFile, pdfFile.name);
 
-                    for (let [name, value] of formData.entries()) {
-                        if (value instanceof Blob) {
-                            console.log(name, "→ blob:", await value.text());
-                        } else {
-                            console.log(name, "→", value);
-                        }
-                    }
+            //         for (let [name, value] of formData.entries()) {
+            //             if (value instanceof Blob) {
+            //                 console.log(name, "→ blob:", await value.text());
+            //             } else {
+            //                 console.log(name, "→", value);
+            //             }
+            //         }
 
-                    // Perform the upload under khasak.ema.md origin
-                    try {
-                        const resp = await fetch(
-                            "https://khasak.ema.md/ema/ws/v3/fileAttachment/upload",
-                            {
-                                method: "POST",
-                                credentials: "include",
-                                body: formData
-                            }
-                        );
-                        if (!resp.ok) {
-                            const errText = await resp.text();
-                            throw new Error(`Upload failed ${resp.status}: ${errText}`);
-                        }
-                        console.log("Upload succeeded:", await resp.json());
-                    } 
-                    catch (err) {
-                        console.error("Upload error:", err);
-                    }
-                },
-                args: [{
-                    id,
-                    patient_lname,
-                    patient_fname,
-                    drug,
-                    b64
-                }]
-            });
+            //         // Perform the upload under khasak.ema.md origin
+            //         try {
+            //             const resp = await fetch(
+            //                 "https://khasak.ema.md/ema/ws/v3/fileAttachment/upload",
+            //                 {
+            //                     method: "POST",
+            //                     credentials: "include",
+            //                     body: formData
+            //                 }
+            //             );
+            //             if (!resp.ok) {
+            //                 const errText = await resp.text();
+            //                 throw new Error(`Upload failed ${resp.status}: ${errText}`);
+            //             }
+            //             console.log("Upload succeeded:", await resp.json());
+            //         } 
+            //         catch (err) {
+            //             console.error("Upload error:", err);
+            //         }
+            //     },
+            //     args: [{
+            //         id,
+            //         patient_lname,
+            //         patient_fname,
+            //         drug,
+            //         b64
+            //     }]
+            // });
 
         })
         .catch(error => console.error(`PA flow error: ${error}`));

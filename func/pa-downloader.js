@@ -65,7 +65,7 @@
 export async function downloadPA(pa_id, pt_fname, pt_lname, med) {
     const pdfUrl = `https://dashboard.covermymeds.com/api/requests/${pa_id}/download`;
     // match pattern for webRequest
-    const confirmationPattern = `*://covermymeds.com/requests/faxconfirmation/${pa_id}*`;
+    const confirmationPattern = `*://www.covermymeds.com/request/faxconfirmation/${pa_id}*`;
 
     // Define the listener function
     const onComplete = (details) => {
