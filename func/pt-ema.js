@@ -53,6 +53,7 @@ export async function findEmaPatient(dob, pt_fname, pt_lname) {
         });
 
         console.log('Matched patients:', matches);
+        return matches;
     }
     catch (error) {
         console.error(`Error fetching user in ema: ${error}`);

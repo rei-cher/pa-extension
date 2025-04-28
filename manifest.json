@@ -10,15 +10,23 @@
         "downloads",
         "scripting",
         "webRequest",
-        "webNavigation"
+        "webNavigation",
+        "declarativeNetRequest"
     ],
     "host_permissions": [
         "*://portal-services.covermymeds.com/*",
         "*://dashboard.covermymeds.com/*",
-        "*://khasak.ema.md/ema/*"
+        "*://khasak.ema.md/*"
     ],
+    "declarative_net_request": {
+        "rule_resources": [{
+            "id": "cors_rules",
+            "enabled": true,
+            "path": "cors_rules.json"
+        }]
+    },
     "background": {
-        "service_worker": "background.js",
+        "service_worker": "dist/background.bundle.js",
         "type": "module"
     },
     "action": {

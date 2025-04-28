@@ -18,36 +18,46 @@ export async function downloadPA(pa_id, pt_fname, pt_lname, med) {
     //     chrome.webRequest.onCompleted.removeListener(onComplete);
     // };
 
-    const onComplete = details => {
-        // tear it down immediately
-        chrome.webRequest.onCompleted.removeListener(onComplete);
+    return new Promise((resolve, reject) => {
+        const onComplete = details => {
+            // tear it down immediately
+            chrome.webRequest.onCompleted.removeListener(onComplete);
+        
+            // now fetch the JSON body ourselves (with cookies)
+            fetch(details.url, { credentials: 'include' })
+              .then(res => {
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return res.json();
+              })
+              .then(data => {
+                if (data.workflow_status === 'Sent to Plan') {
+                  // now fetch the actual PDF as a Blob
+                  fetch(pdfUrl, { credentials: 'include' })
+                    .then(res2 => {
+                      if (!res2.ok) throw new Error(`PDF fetch failed ${res2.status}`);
+                      return res2.blob();
+                    })
+                    .then(blob => {
+                      // wrap the blob in a File so uploadPdf can read .name
+                      const file = new File(
+                        [blob],
+                        `${pt_fname}-${pt_lname}-${med}.pdf`,
+                        { type: blob.type }
+                      );
+                      resolve(file);
+                    })
+                    .catch(reject);
+                } else {
+                  reject(`Bad status: ${data.workflow_status}`);
+                }
+              })
+              .catch(reject);
+          };
     
-        // now fetch the JSON body ourselves (with cookies)
-        fetch(details.url, { credentials: 'include' })
-          .then(res => {
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            return res.json();
-          })
-          .then(data => {
-            if (data.workflow_status === 'Sent to Plan') {
-              chrome.downloads.download({
-                url:      pdfUrl,
-                filename: `${pt_fname}-${pt_lname}-${med}.pdf`
-              }, downloadId => {
-                console.log('Download started:', downloadId);
-              });
-            } else {
-              console.log('Not Sent to Plan (status=', data.workflow_status, ')');
-            }
-          })
-          .catch(err => console.error('Error checking workflow_status:', err));
-      };
-
-    // add it, filtered to exactly your confirmation URL
-    chrome.webRequest.onCompleted.addListener(
-        onComplete,
-        { urls: [ confirmationPattern ] }
-    );
+        // add it, filtered to exactly your confirmation URL
+        chrome.webRequest.onCompleted.addListener(
+            onComplete,
+            { urls: [ confirmationPattern ] }
+        );
+    });
 }
-
-self.downloadPA = downloadPA;

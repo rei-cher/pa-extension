@@ -40,7 +40,7 @@ export async function getPatientInfo(pa_id) {
         patient_fname: data.patient_fname,
         patient_lname: data.patient_lname,
         patient_dob: extractPatientDOB(data),
-        drug: data.drug
+        drug: data.drug.split(' ')[0]
       };
       
     } 
