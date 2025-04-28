@@ -61,3 +61,29 @@ export async function downloadPA(pa_id, pt_fname, pt_lname, med) {
         );
     });
 }
+
+export async function downloadPA(pa_id, pt_fname, pt_lname, med) {
+    const pdfUrl = `https://dashboard.covermymeds.com/api/requests/${pa_id}/download`;
+    // match pattern for webRequest
+    const confirmationPattern = `*://covermymeds.com/requests/faxconfirmation/${pa_id}*`;
+
+    // Define the listener function
+    const onComplete = (details) => {
+        // Check if the request URL matches the confirmationPattern and if the status is 200
+        if (details.statusCode === 200 && details.url.match(confirmationPattern)) {
+            // Start the download after receiving a 200 OK status for the confirmation URL
+            chrome.downloads.download({
+                url: pdfUrl,
+                filename: `${pt_fname}-${pt_lname}-${med}.pdf`
+            }, (downloadId) => {
+                console.log('Download started, id=', downloadId);
+            });
+
+            // Remove the listener so it doesn't fire again
+            chrome.webRequest.onCompleted.removeListener(onComplete);
+        }
+    };
+
+    // Add the listener to listen for the confirmation URL request
+    chrome.webRequest.onCompleted.addListener(onComplete, { urls: [confirmationPattern] });
+}
