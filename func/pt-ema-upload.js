@@ -2,6 +2,8 @@ export async function uploadPdf({ patientId, patientLname, patientFname, drug, f
     if (!(file instanceof Blob)) {
         throw new Error("`file` must be a Blob or File");
     }
+
+    console.log("Upload PDF called");
     
     // build your dtoList JSON
     const dto = [{

@@ -2,7 +2,18 @@ import { getCookie } from "./func/cmm-cookie.js";
 import { getPatientInfo } from "./func/pt-pa-info.js";
 import { downloadPA } from "./func/pa-downloader.js";
 import { findEmaPatient } from "./func/pt-ema.js";
-import { uploadPdf } from "./func/pt-ema-upload.js";
+
+//utility
+const fileToBase64 = file =>
+    new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            const base64 = reader.result.split(",")[1];
+            resolve (base64);
+        }
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
 
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     // wait until the request page is fully loaded
@@ -10,16 +21,6 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     
     const url = tab.url;
     if (!url.includes('/v2/requests/')) return;
-
-    await chrome.scripting.executeScript({
-        target: { tabId },
-        func: () => {
-            const s = document.createElement("script");
-            s.type = "module";
-            s.src = chrome.runtime.getURL("content/ema-upload.js");
-            document.head.appendChild(s);
-        },
-    });
   
     const pa_id = url.split('/').pop();
   
@@ -42,72 +43,83 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
         .then(async ({ file, patient_fname, patient_lname, patient_dob, drug }) => {
             // now we’ve waited for the download, so findEmaPatient and uploadPdf
             const patientArr = await findEmaPatient(patient_dob, patient_fname, patient_lname);
+            if (!patientArr.length) throw new Error("No matching EMA patient found");
             const id = patientArr[0].id;
-            
-            // send the upload job to the content script
-            // chrome.tabs.sendMessage(tabId, {
-            //     action: 'uploadPdf',
-            //     payload: {
-            //         patientId: id,
-            //         patientLname: patient_lname,
-            //         patientFname: patient_fname,
-            //         drug,
-            //         file
-            //     }
-            // },
-            //     response => {
-            //         if (chrome.runtime.lastError) {
-            //             console.warn("Message could not be delivered:", chrome.runtime.lastError.message);
-            //             return;
-            //         }
-                    
-            //         if (response?.success) {
-            //             console.log("upload suceeded: ",response.data);
-            //         }
-            //         else {
-            //             console.error("upload failed: ",response?.error);
-            //         }
-            //     }
-            // );
-            // try {
-            //     const data = await uploadPdf({
-            //         patientId: id,
-            //         patientLname: patient_lname,
-            //         patientFname: patient_fname,
-            //         drug,
-            //         file
-            //     });
-            //     console.log("upload succeeded:", data);
-            // }
-            // catch (error) {
-            //     console.error('upload failed: ', error);
-            // }
+
+            // Convert the PDF File to Base64
+            const b64 = await fileToBase64(file);
+
+            // Find the EMA tab (where the user is logged in to khasak.ema.md)
+            const emaTabs = await chrome.tabs.query({ url: "*://khasak.ema.md/*" });
+            if (!emaTabs.length) throw new Error("Could not find an open EMA tab");
+            const emaTabId = emaTabs[0].id;
 
             await chrome.scripting.executeScript({
-                target: { tabId },
-                func: async ({ patientId, patientLname, patientFname, drug, file }) => {
-                  try {
-                    const data = await window.uploadPdf({
-                      patientId,
-                      patientLname,
-                      patientFname,
-                      drug,
-                      file
-                    });
-                    console.log("upload succeeded:", data);
-                  } catch (e) {
-                    console.error("upload failed:", e);
-                  }
+                target: { tabId: emaTabId },
+                world: "MAIN",
+                func: async ({ id, patient_lname, patient_fname, drug, b64 }) => {
+                    // Reconstruct the PDF Blob & File
+                    const blob = await (await fetch(`data:application/pdf;base64,${b64}`)).blob();
+                    const pdfFile = new File(
+                        [blob],
+                        `${patient_fname}-${patient_lname}-${drug}.pdf`,
+                        { type: "application/pdf" }
+                    );
+
+                    // Build the DTO and FormData
+                    const dto = [{
+                        patient: {
+                            id: String(id),
+                            lastName: patient_lname,
+                            firstName: patient_fname
+                        },
+                        additionalInfo: {
+                            performedDate: new Date().toISOString()
+                        },
+                        fileName: pdfFile.name,
+                        title: `${drug} pa submitted: ${new Date().toLocaleDateString()}`
+                    }];
+
+                    const formData = new FormData();
+                    formData.append("dtoList", JSON.stringify(dto));
+                    formData.append("files", pdfFile, pdfFile.name);
+
+                    for (let [name, value] of formData.entries()) {
+                        if (value instanceof Blob) {
+                            console.log(name, "→ blob:", await value.text());
+                        } else {
+                            console.log(name, "→", value);
+                        }
+                    }
+
+                    // Perform the upload under khasak.ema.md origin
+                    try {
+                        const resp = await fetch(
+                            "https://khasak.ema.md/ema/ws/v3/fileAttachment/upload",
+                            {
+                                method: "POST",
+                                credentials: "include",
+                                body: formData
+                            }
+                        );
+                        if (!resp.ok) {
+                            const errText = await resp.text();
+                            throw new Error(`Upload failed ${resp.status}: ${errText}`);
+                        }
+                        console.log("Upload succeeded:", await resp.json());
+                    } 
+                    catch (err) {
+                        console.error("Upload error:", err);
+                    }
                 },
-                // pass blob and metadata along
                 args: [{
-                  patientId:   id,
-                  patientLname: patient_lname,
-                  patientFname: patient_fname,
-                  drug,
-                  file
+                    id,
+                    patient_lname,
+                    patient_fname,
+                    drug,
+                    b64
                 }]
-              });
+            });
 
         })
         .catch(error => console.error(`PA flow error: ${error}`));
