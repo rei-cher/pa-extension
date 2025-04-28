@@ -65,12 +65,12 @@
 export async function downloadPA(pa_id, pt_fname, pt_lname, med) {
     const pdfUrl = `https://dashboard.covermymeds.com/api/requests/${pa_id}/download`;
     // match pattern for webRequest
-    const confirmationPattern = `*://www.covermymeds.com/request/faxconfirmation/${pa_id}*`;
+    const confirmationPattern = `*://covermymeds.com/requests/faxconfirmation/${pa_id}*`;
 
     // Define the listener function
     const onComplete = (details) => {
-        // Check if the request URL matches the confirmationPattern and if the status is 200
-        if (details.statusCode === 200 && details.url.match(confirmationPattern)) {
+        // Check if the request type is 'document', status is 200, and URL matches the confirmationPattern
+        if (details.statusCode === 200 && details.url.match(confirmationPattern) && details.type === 'main_frame') {
             // Start the download after receiving a 200 OK status for the confirmation URL
             chrome.downloads.download({
                 url: pdfUrl,
@@ -84,6 +84,10 @@ export async function downloadPA(pa_id, pt_fname, pt_lname, med) {
         }
     };
 
-    // Add the listener to listen for the confirmation URL request
-    chrome.webRequest.onCompleted.addListener(onComplete, { urls: [confirmationPattern] });
+    // Add the listener to listen for the confirmation URL request of type 'document'
+    chrome.webRequest.onCompleted.addListener(onComplete, { 
+        urls: [confirmationPattern],
+        types: ['main_frame'] // Listen for document requests
+    });
 }
+
