@@ -5,8 +5,9 @@ function extractPatientDOB(data) {
   for (const section of data.sections || []) {
     for (const row of section.rows || []) {
       for (const q of row.questions || []) {
-        const prompt = q.question_text || q.label || '';
-        if (/date of birth/i.test(prompt)) {
+        const prompt = q.question_text || q.label || q.name || '';
+        // console.log(prompt);
+        if (/date of birth/i.test(prompt) || /patient_date_of_birth/i.test(prompt)) {
           return q.answer_text ?? q.answer ?? null;
         }
       }
