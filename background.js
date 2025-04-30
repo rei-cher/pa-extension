@@ -1,6 +1,6 @@
 import { getCookie } from "./func/cmm-cookie.js";
-import { getPatientInfo } from "./func/pt-pa-info.js";
-import { downloadPA } from "./func/pa-downloader.js";
+import { getPAInfo } from "./func/pt-pa-info.js";
+import { downloadPA, waitForDownloadFilename } from "./func/pa-downloader.js";
 import { findEmaPatient } from "./func/pt-ema.js";
 
 // Utility function to convert file to base64 (not used in this code but might be useful)
@@ -28,51 +28,40 @@ chrome.webRequest.onCompleted.addListener(
 
         // Check if the URL is the expected one and response is valid
         if (
-            details.url === `https://dashboard.covermymeds.com/api/requests/${pa_id}?type=Web%20Socket` ||
-            details.url === `https://dashboard.covermymeds.com/api/requests/${pa_id}?type=Elapsed%20Time`
+            details.url.includes(`dashboard.covermymeds.com/api/requests/${pa_id}?type=Web%20Socket`) ||
+            details.url.includes(`dashboard.covermymeds.com/api/requests/${pa_id}?type=Elapsed%20Time`) ||
+            details.url.includes(`covermymeds.com/request/faxconfirmation/${pa_id}`)
         ) {
-            // Check if response contains 'ePa_Status_description' with the value 'PA Request - Sent to Plan'
-            chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-                chrome.scripting.executeScript({
-                    target: { tabId: tabs[0].id },
-                    func: checkStatusAndDownload,
-                    args: [pa_id]  // Pass PA ID to the script
-                });
-            });
-        }
-
-        // check is the page changed to the fax confirmation page
-        else if (details.url.includes(`covermymeds.com/request/faxconfirmation/${pa_id}`)){
-            // get the patient info to pass to downloadPA
-            // TODO: use this info to find a patient in ema and upload downloaded pdf to that patient's page
-            getPatientInfo(pa_id).then((patient_info) => {
-                const patient_fname = patient_info.patient_fname;
-                const patient_lname = patient_info.patient_lname;
-                const patient_dob = patient_info.patient_dob;
-                const drug = patient_info.drug;
-
-                console.log(patient_fname, patient_lname, drug);
-
-                // TODO: sanitize patietn names and dob
-                // dob should be stored in safeDOB as mm-dd-yyyy
-                // check if any name is a compound, then split with '-'
-
-                // download PA
-                downloadPA(pa_id, patient_fname, patient_lname, drug);
-            })
+            pdfManipulation(pa_id);
         }
     },
     // listen to the responses on those 2 pages for status updates on PAs
     { urls: ["*://dashboard.covermymeds.com/api/requests/*", "*://www.covermymeds.com/request/*"] }
 );
 
-// Function to check response data and trigger download if needed
-function checkStatusAndDownload(pa_id) {
-    console.log("checkStatusAndDownload called");
-    console.log("window.data: ", window.data);
+function pdfManipulation(pa_id) {
+    getPAInfo(pa_id).then((pa_info) => {
+        const patient_fname = pa_info.patient_fname;
+        const patient_lname = pa_info.patient_lname;
+        const patient_dob = pa_info.patient_dob;
+        const drug = pa_info.drug;
+        const submitted_by = pa_info.submitted_by;
+        const epa_status = pa_info.epa_status;
 
-    // Example of how to check the page's data (replace this with your logic to get the API response)
-    if (window.data && window.data.ePa_Status_description === 'PA Request - Sent to Plan') {
-        console.log('Found matching status in API response, triggering download');
-    }
+        console.log(patient_fname, patient_lname, drug);
+
+        // TODO: sanitize patietn names and dob
+        // dob should be stored in safeDOB as mm-dd-yyyy
+        // check if any name is a compound, then split with '-'
+
+        // download PA
+        downloadPA(pa_id, patient_fname, patient_lname, drug)
+            .then(downloadedID => {
+                // waiting for download to complete and get a filepath
+                return waitForDownloadFilename(downloadedID);
+            })
+            .then(filepath => {
+                console.log("PDF path: ", filepath);
+            })
+    });
 }

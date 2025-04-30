@@ -16,7 +16,7 @@ function extractPatientDOB(data) {
   return null;
 }
 
-export async function getPatientInfo(pa_id) {
+export async function getPAInfo(pa_id) {
     console.log(`Getting patient info with ID - ${pa_id}`)
     const url = `https://dashboard.covermymeds.com/api/requests/${pa_id}?`;
   
@@ -41,7 +41,9 @@ export async function getPatientInfo(pa_id) {
         patient_fname: data.patient_fname,
         patient_lname: data.patient_lname,
         patient_dob: extractPatientDOB(data),
-        drug: data.drug.split(' ')[0]
+        drug: data.drug.split(' ')[0],
+        submitted_by: data.submitted_by,
+        epa_status: data.ePA_Status_description
       };
       
     } 
