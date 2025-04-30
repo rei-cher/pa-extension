@@ -16,7 +16,8 @@
     "host_permissions": [
         "*://portal-services.covermymeds.com/*",
         "*://dashboard.covermymeds.com/*",
-        "*://khasak.ema.md/*"
+        "*://khasak.ema.md/*",
+        "*://www.covermymeds.com/*"
     ],
     "declarative_net_request": {
         "rule_resources": [{

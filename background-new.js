@@ -1,8 +1,7 @@
-// background.js
 import { getCookie }     from './func/cmm-cookie.js';
 import { getPatientInfo } from './func/pt-pa-info.js';
 
-// 1️⃣ When the PA-request API returns, stash the patient info
+// When the PA-request API returns, stash the patient info
 chrome.webRequest.onCompleted.addListener(
   async details => {
     // match e.g. https://dashboard.covermymeds.com/api/requests/ABC123
@@ -12,7 +11,7 @@ chrome.webRequest.onCompleted.addListener(
 
     try {
       // fetch session token & patient info
-      const token = await getCookie(details.initiator || details.originUrl);
+      const token = getCookie(details.url);
       if (!token) throw new Error('No session token');
       const info = await getPatientInfo(pa_id);
       // store it keyed by PA ID
@@ -24,7 +23,7 @@ chrome.webRequest.onCompleted.addListener(
   { urls: ['*://dashboard.covermymeds.com/api/requests/*'] }
 );
 
-// 2️⃣ When the PDF‐download URL completes, pull that info and actually download
+// When the PDF‐download URL completes, pull that info and actually download
 chrome.webRequest.onCompleted.addListener(
   details => {
     const m = details.url.match(/\/api\/requests\/([^/]+)\/download/);

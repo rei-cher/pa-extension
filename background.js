@@ -15,44 +15,22 @@ const fileToBase64 = file =>
         reader.readAsDataURL(file);
     });
 
-// Listen for tab updates
-chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
-    // Wait until the request page is fully loaded
-    if (changeInfo.status !== 'complete') return;
-
-    const url = tab.url;
-    if (!url.includes('/v2/requests/')) return;
-
-    const pa_id = url.split('/').pop();
-    const confirmationPattern = `*://www.covermymeds.com/request/faxconfirmation/${pa_id}*`;
-
-    // Check for session token and patient info
-    getCookie(url)
-        .then(token => {
-            if (!token) throw new Error(`No session token for ${url}`);
-            return getPatientInfo(pa_id);  // Removed token from here as it was not used
-        })
-        .then(async ({ patient_fname, patient_lname, patient_dob, drug }) => {
-            const dobSafe = patient_dob.replace(/\//g, '-');
-            console.log({ patient_fname, patient_lname, dobSafe, drug });
-
-            // Check if the URL matches the confirmation pattern
-            if (changeInfo.url && changeInfo.url.match(confirmationPattern)) {
-                console.log("URL changed to requested match pattern URL");
-                // Trigger the PA download
-                downloadPA(pa_id, patient_fname, patient_lname, drug);
-            }
-        })
-        .catch(error => console.error(`PA flow error: ${error}`));
-});
-
 // Listen for API responses from the dashboard
 chrome.webRequest.onCompleted.addListener(
     (details) => {
-        const pa_id = details.url.split('/').pop();  // Extract PA ID from the API URL
+        const url_parts = details.url.split('/');  // Extract PA ID from the API URL
+        let pa_id = url_parts[5];
+        if (pa_id.includes("?")) {
+            pa_id = pa_id.split("?")[0];
+        }
+        console.log("PA ID: ", pa_id);
+        console.log("Details object: ", details);
 
         // Check if the URL is the expected one and response is valid
-        if (details.url.includes(`dashboard.covermymeds.com/api/requests/${pa_id}`)) {
+        if (
+            details.url === `https://dashboard.covermymeds.com/api/requests/${pa_id}?type=Web%20Socket` ||
+            details.url === `https://dashboard.covermymeds.com/api/requests/${pa_id}?type=Elapsed%20Time`
+        ) {
             // Check if response contains 'ePa_Status_description' with the value 'PA Request - Sent to Plan'
             chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
                 chrome.scripting.executeScript({
@@ -62,16 +40,39 @@ chrome.webRequest.onCompleted.addListener(
                 });
             });
         }
+
+        // check is the page changed to the fax confirmation page
+        else if (details.url.includes(`covermymeds.com/request/faxconfirmation/${pa_id}`)){
+            // get the patient info to pass to downloadPA
+            // TODO: use this info to find a patient in ema and upload downloaded pdf to that patient's page
+            getPatientInfo(pa_id).then((patient_info) => {
+                const patient_fname = patient_info.patient_fname;
+                const patient_lname = patient_info.patient_lname;
+                const patient_dob = patient_info.patient_dob;
+                const drug = patient_info.drug;
+
+                console.log(patient_fname, patient_lname, drug);
+
+                // TODO: sanitize patietn names and dob
+                // dob should be stored in safeDOB as mm-dd-yyyy
+                // check if any name is a compound, then split with '-'
+
+                // download PA
+                downloadPA(pa_id, patient_fname, patient_lname, drug);
+            })
+        }
     },
-    { urls: ["*://dashboard.covermymeds.com/api/requests/*"] }
+    // listen to the responses on those 2 pages for status updates on PAs
+    { urls: ["*://dashboard.covermymeds.com/api/requests/*", "*://www.covermymeds.com/request/*"] }
 );
 
 // Function to check response data and trigger download if needed
 function checkStatusAndDownload(pa_id) {
+    console.log("checkStatusAndDownload called");
+    console.log("window.data: ", window.data);
+
     // Example of how to check the page's data (replace this with your logic to get the API response)
     if (window.data && window.data.ePa_Status_description === 'PA Request - Sent to Plan') {
         console.log('Found matching status in API response, triggering download');
-        // Trigger downloadPA when the status matches
-        downloadPA(pa_id);
     }
 }
