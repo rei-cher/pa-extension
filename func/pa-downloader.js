@@ -8,8 +8,8 @@ export async function downloadPA(pa_id, pt_fname, pt_lname, med) {
             url: pdfUrl,
             filename: `${pt_fname}-${pt_lname}-${med}.pdf`
         }, downloadId => {
+            console.log('Download started, id=', downloadId);
             if (downloadId) {
-                console.log('Download started, id=', downloadId);
                 resolve(downloadId);
             }
         });
@@ -23,13 +23,11 @@ export function waitForDownloadFilename(downloadId) {
                 chrome.downloads.search({id: downloadId}, results => {
                     if (results && results.length > 0) {
                         resolve(results[0].filename);
-                        chrome.downloads.onChanged.removeListener(listener);
                     } else {
                         reject(new Error("No results for downloadId"));
                     }
                 });
             }
         };
-        chrome.downloads.onChanged.addListener(listener);
     });
 }

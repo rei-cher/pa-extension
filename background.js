@@ -15,27 +15,69 @@ const fileToBase64 = file =>
         reader.readAsDataURL(file);
     });
 
-// Listen for API responses from the dashboard
-chrome.webRequest.onCompleted.addListener(
-    (details) => {
-        const url_parts = details.url.split('/');  // Extract PA ID from the API URL
-        let pa_id = url_parts[5];
+const processedPA = new Set();
+const processingPA = new Set();
+
+// handle function to listen and download pa 
+function handlePARequest(details) {
+    let pa_id;
+    if (details.url.includes('dashboard.covermymeds.com/api/requests/')) {
+        // extracting pa id
+        const url_parts = details.url.split('/');
+        pa_id = url_parts[5];
         if (pa_id.includes("?")) {
             pa_id = pa_id.split("?")[0];
         }
-        console.log("PA ID: ", pa_id);
-        console.log("Details object: ", details);
+    }
 
-        // Check if the URL is the expected one and response is valid
-        if (
-            details.url.includes(`dashboard.covermymeds.com/api/requests/${pa_id}?type=Web%20Socket`) ||
-            details.url.includes(`dashboard.covermymeds.com/api/requests/${pa_id}?type=Elapsed%20Time`) ||
-            details.url.includes(`covermymeds.com/request/faxconfirmation/${pa_id}`)
-        ) {
-            pdfManipulation(pa_id);
-        }
-    },
-    // listen to the responses on those 2 pages for status updates on PAs
+    if (!pa_id || processedPA.has(pa_id) || processingPA.has(pa_id)) {
+        return;
+    }
+
+    processingPA.add(pa_id);
+
+    // getting pa info
+    getPAInfo(pa_id)
+        .then((pa_info) => {
+            const patient_fname = pa_info.patient_fname;
+            const patient_lname = pa_info.patient_lname;
+            const patient_dob = pa_info.patient_dob;
+            const drug = pa_info.drug;
+            const submitted_by = pa_info.submitted_by;
+            const epa_status = pa_info.epa_status;
+
+            console.log(patient_fname, patient_lname, drug);
+            console.log("Submitted by: ", submitted_by);
+            console.log("ePA status: ", epa_status);
+
+            if (
+                epa_status === "PA Request - Sent to Plan" ||
+                details.url.includes(`covermymeds.com/request/faxconfirmation/${pa_id}`)
+            ) {
+                processedPA.add(pa_id);
+
+                downloadPA(pa_id, patient_fname, patient_lname, drug)
+                    .then(downloadedID => {
+                        return waitForDownloadFilename(downloadedID);
+                    })
+                    .then(filepath => {
+                        console.log("PDF path: ", filepath);
+                        // stop listening after one successful case
+                        console.log("Listener removed.");
+                    });
+            }
+        })
+        .catch(error => {
+            console.error(`Error processing pa ${pa_id}: `, error)
+        })
+        .finally(() => {
+            processingPA.delete(pa_id);
+        })
+}
+
+// Attach the listener for API responses from the dashboard
+chrome.webRequest.onCompleted.addListener(
+    handlePARequest,
     { urls: ["*://dashboard.covermymeds.com/api/requests/*", "*://www.covermymeds.com/request/*"] }
 );
 

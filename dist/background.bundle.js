@@ -1,76 +1,72 @@
-function i(o) {
-  if (o.patient_dob) return o.patient_dob;
-  for (const n of o.sections || [])
-    for (const e of n.rows || [])
-      for (const t of e.questions || []) {
-        const r = t.question_text || t.label || t.name || "";
-        if (/date of birth/i.test(r) || /patient_date_of_birth/i.test(r))
-          return t.answer_text ?? t.answer ?? null;
+function u(n) {
+  if (n.patient_dob) return n.patient_dob;
+  for (const e of n.sections || [])
+    for (const t of e.rows || [])
+      for (const o of t.questions || []) {
+        const s = o.question_text || o.label || o.name || "";
+        if (/date of birth/i.test(s) || /patient_date_of_birth/i.test(s))
+          return o.answer_text ?? o.answer ?? null;
       }
   return null;
 }
-async function c(o) {
-  console.log(`Getting patient info with ID - ${o}`);
-  const n = `https://dashboard.covermymeds.com/api/requests/${o}?`;
+async function m(n) {
+  console.log(`Getting patient info with ID - ${n}`);
+  const e = `https://dashboard.covermymeds.com/api/requests/${n}?`;
   try {
-    const e = await fetch(n, {
+    const t = await fetch(e, {
       method: "GET",
       credentials: "include",
       headers: {
         Accept: "application/json"
       }
     });
-    if (!e.ok)
-      throw new Error(`HTTP ${e.status}`);
-    const t = await e.json();
-    return console.log("PA data:", t), {
-      patient_fname: t.patient_fname,
-      patient_lname: t.patient_lname,
-      patient_dob: i(t),
-      drug: t.drug.split(" ")[0]
+    if (!t.ok)
+      throw new Error(`HTTP ${t.status}`);
+    const o = await t.json();
+    return console.log("PA data:", o), {
+      patient_fname: o.patient_fname,
+      patient_lname: o.patient_lname,
+      patient_dob: u(o),
+      drug: o.drug.split(" ")[0],
+      submitted_by: o.submitted_by,
+      epa_status: o.ePA_Status_description
     };
-  } catch (e) {
-    throw console.error("Error fetching PA info:", e), e;
+  } catch (t) {
+    throw console.error("Error fetching PA info:", t), t;
   }
 }
-self.getPatientInfo = c;
-async function l(o, n, e, t) {
-  return new Promise((r) => {
-    const s = `https://dashboard.covermymeds.com/api/requests/${o}/download`;
+async function p(n, e, t, o) {
+  return new Promise((s) => {
+    const a = `https://dashboard.covermymeds.com/api/requests/${n}/download`;
     console.log("downloadPA called"), chrome.downloads.download({
-      url: s,
-      filename: `${n}-${e}-${t}.pdf`
-    }, (a) => {
-      a && (console.log("Download started, id=", a), r(a));
+      url: a,
+      filename: `${e}-${t}-${o}.pdf`
+    }, (r) => {
+      console.log("Download started, id=", r), r && s(r);
     });
   });
 }
-function d(o) {
-  return new Promise((n, e) => {
-    const t = (r) => {
-      var s;
-      r.id === o && ((s = r.state) == null ? void 0 : s.current) === "complete" && chrome.downloads.search({ id: o }, (a) => {
-        a && a.length > 0 ? (n(a[0].filename), chrome.downloads.onChanged.removeListener(t)) : e(new Error("No results for downloadId"));
-      });
-    };
-    chrome.downloads.onChanged.addListener(t);
+function f(n) {
+  return new Promise((e, t) => {
   });
+}
+const d = /* @__PURE__ */ new Set(), c = /* @__PURE__ */ new Set();
+function h(n) {
+  let e;
+  n.url.includes("dashboard.covermymeds.com/api/requests/") && (e = n.url.split("/")[5], e.includes("?") && (e = e.split("?")[0])), !(!e || d.has(e) || c.has(e)) && (c.add(e), m(e).then((t) => {
+    const o = t.patient_fname, s = t.patient_lname;
+    t.patient_dob;
+    const a = t.drug, r = t.submitted_by, i = t.epa_status;
+    console.log(o, s, a), console.log("Submitted by: ", r), console.log("ePA status: ", i), (i === "PA Request - Sent to Plan" || n.url.includes(`covermymeds.com/request/faxconfirmation/${e}`)) && (d.add(e), p(e, o, s, a).then((l) => f()).then((l) => {
+      console.log("PDF path: ", l), console.log("Listener removed.");
+    }));
+  }).catch((t) => {
+    console.error(`Error processing pa ${e}: `, t);
+  }).finally(() => {
+    c.delete(e);
+  }));
 }
 chrome.webRequest.onCompleted.addListener(
-  (o) => {
-    let e = o.url.split("/")[5];
-    e.includes("?") && (e = e.split("?")[0]), console.log("PA ID: ", e), console.log("Details object: ", o), (o.url.includes(`dashboard.covermymeds.com/api/requests/${e}?type=Web%20Socket`) || o.url.includes(`dashboard.covermymeds.com/api/requests/${e}?type=Elapsed%20Time`) || o.url.includes(`covermymeds.com/request/faxconfirmation/${e}`)) && m(e);
-  },
-  // listen to the responses on those 2 pages for status updates on PAs
+  h,
   { urls: ["*://dashboard.covermymeds.com/api/requests/*", "*://www.covermymeds.com/request/*"] }
 );
-function m(o) {
-  c(o).then((n) => {
-    const e = n.patient_fname, t = n.patient_lname;
-    n.patient_dob;
-    const r = n.drug;
-    console.log(e, t, r), l(o, e, t, r).then((s) => (console.log("Checking the pass of the downloaded pdf file id: ", s), d(s))).then((s) => {
-      console.log("PDF path: ", s);
-    });
-  });
-}

@@ -52,5 +52,3 @@ export async function getPAInfo(pa_id) {
       throw error;
     }
 }
-
-self.getPatientInfo = getPatientInfo;
