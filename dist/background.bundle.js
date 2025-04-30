@@ -51,13 +51,13 @@ function f(n) {
   });
 }
 const d = /* @__PURE__ */ new Set(), c = /* @__PURE__ */ new Set();
-function h(n) {
+function w(n) {
   let e;
-  n.url.includes("dashboard.covermymeds.com/api/requests/") && (e = n.url.split("/")[5], e.includes("?") && (e = e.split("?")[0])), !(!e || d.has(e) || c.has(e)) && (c.add(e), m(e).then((t) => {
+  (n.url.includes("dashboard.covermymeds.com/api/requests/") || n.url.includes("www.covermymeds.com/request/faxconfirmation/")) && (e = n.url.split("/")[5], e.includes("?") && (e = e.split("?")[0])), !(!e || d.has(e) || c.has(e)) && (c.add(e), m(e).then((t) => {
     const o = t.patient_fname, s = t.patient_lname;
     t.patient_dob;
     const a = t.drug, r = t.submitted_by, i = t.epa_status;
-    console.log(o, s, a), console.log("Submitted by: ", r), console.log("ePA status: ", i), (i === "PA Request - Sent to Plan" || n.url.includes(`covermymeds.com/request/faxconfirmation/${e}`)) && (d.add(e), p(e, o, s, a).then((l) => f()).then((l) => {
+    console.log(o, s, a), console.log("Submitted by: ", r), console.log("ePA status: ", i), console.log("Details: ", n), (i === "PA Request - Sent to Plan" || n.url.includes(`covermymeds.com/request/faxconfirmation/${e}`)) && (d.add(e), p(e, o, s, a).then((l) => f()).then((l) => {
       console.log("PDF path: ", l), console.log("Listener removed.");
     }));
   }).catch((t) => {
@@ -67,6 +67,6 @@ function h(n) {
   }));
 }
 chrome.webRequest.onCompleted.addListener(
-  h,
+  w,
   { urls: ["*://dashboard.covermymeds.com/api/requests/*", "*://www.covermymeds.com/request/*"] }
 );

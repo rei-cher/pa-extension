@@ -21,7 +21,10 @@ const processingPA = new Set();
 // handle function to listen and download pa 
 function handlePARequest(details) {
     let pa_id;
-    if (details.url.includes('dashboard.covermymeds.com/api/requests/')) {
+    if (
+        details.url.includes('dashboard.covermymeds.com/api/requests/') || 
+        details.url.includes('www.covermymeds.com/request/faxconfirmation/')
+    ) {
         // extracting pa id
         const url_parts = details.url.split('/');
         pa_id = url_parts[5];
@@ -49,6 +52,7 @@ function handlePARequest(details) {
             console.log(patient_fname, patient_lname, drug);
             console.log("Submitted by: ", submitted_by);
             console.log("ePA status: ", epa_status);
+            console.log("Details: ", details);
 
             if (
                 epa_status === "PA Request - Sent to Plan" ||
