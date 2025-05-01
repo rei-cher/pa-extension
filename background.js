@@ -48,6 +48,8 @@ function handlePARequest(details) {
             const drug = pa_info.drug;
             const submitted_by = pa_info.submitted_by;
             const epa_status = pa_info.epa_status;
+            const workflow_status = pa_info.workflow_status;
+            const submitted_by_user_category = pa_info.submitted_by_user_category;
 
             console.log(patient_fname, patient_lname, drug);
             console.log("Submitted by: ", submitted_by);
@@ -55,8 +57,8 @@ function handlePARequest(details) {
             console.log("Details: ", details);
 
             if (
-                epa_status === "PA Request - Sent to Plan" ||
-                details.url.includes(`covermymeds.com/request/faxconfirmation/${pa_id}`)
+                epa_status === "PA Request - Sent to Plan" ||   // checking status for pas that are sent, but didn't go to the faxconfirmation page
+                submitted_by_user_category === "PRESCRIBER"     // checking for fax being sent for pas that are went to faxconfirmation page (NOTE: from url *request/faxconfirmation/*)
             ) {
                 processedPA.add(pa_id);
 
@@ -77,6 +79,13 @@ function handlePARequest(details) {
                             chrome.storage.local.set({ downloadHistory: history });
                         });
                     });
+            }
+            else if (
+                epa_status === "PA Response" ||
+                epa_status === "Question Response" ||
+                workflow_status === "Sent to Plan"
+            ) {
+                processedPA.add(pa_id);
             }
         })
         .catch(error => {

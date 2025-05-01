@@ -43,7 +43,9 @@ export async function getPAInfo(pa_id) {
         patient_dob: extractPatientDOB(data),
         drug: data.drug.split(' ')[0],
         submitted_by: data.submitted_by,
-        epa_status: data.ePA_Status_description
+        epa_status: data.ePA_Status_description,
+        workflow_status: data.workflow_status,
+        submitted_by_user_category: data.submitted_by_user_category
       };
       
     } 
