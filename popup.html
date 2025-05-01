@@ -1,5 +1,26 @@
+<!DOCTYPE html>
 <html>
+    <head>
+        <title>Download History</title>
+        <style>
+            html, body {
+                width: 300px;
+                height: 400px;
+                margin: 0;
+                padding: 10px;
+                box-sizing: border-box;
+                font-family: Arial, sans-serif;
+            }
+            h2 { font-size: 16px; }
+            ul { padding-left: 16px; }
+            li { font-size: 14px; word-break: break-all; margin-bottom: 4px; }
+        </style>
+    </head>
+
     <body>
-        
+        <h2>Last 10 Downloads</h2>
+        <ul id="historyList"></ul>
+
+        <script src="popup.js"></script>
     </body>
 </html>

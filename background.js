@@ -68,6 +68,14 @@ function handlePARequest(details) {
                         console.log("PDF path: ", filepath);
                         // stop listening after one successful case
                         console.log("Listener removed.");
+
+                        // Update history in storage
+                        chrome.storage.local.get(['downloadHistory'], result => {
+                            let history = result.downloadHistory || [];
+                            history.unshift(filepath); // add to front
+                            history = history.slice(0, 10); // keep only last 10
+                            chrome.storage.local.set({ downloadHistory: history });
+                        });
                     });
             }
         })
