@@ -97,6 +97,7 @@ chrome.webNavigation.onHistoryStateUpdated.addListener((details) => {
   if (!match) return;
 
   const pa_id = match[1];
+  console.log("webNavigation pa_id: ", pa_id)
   processAndDownload(pa_id);
 }, {
   // filter to only run on covermymeds domains
