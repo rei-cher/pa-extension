@@ -16,7 +16,7 @@ export async function downloadPA(pa_id, pt_fname, pt_lname, med) {
     })
 }
 
-export function waitForDownloadFilename(downloadId) {
+export async function waitForDownloadFilename(downloadId) {
     return new Promise((resolve, reject) => {
         const listener = delta => {
             if (delta.id === downloadId && delta.state?.current === 'complete') {
