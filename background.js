@@ -63,7 +63,7 @@ function processAndDownload(pa_id) {
     .finally(() => processingPA.delete(pa_id));
 }
 
-// 1) webRequest listener (only for currentTabId)
+// webRequest listener (only for currentTabId)
 function handlePARequest(details) {
   // ignore requests from other tabs
   if (details.tabId !== currentTabId) return;
@@ -87,7 +87,7 @@ chrome.webRequest.onCompleted.addListener(
   }
 );
 
-// 2) tabs.onUpdated listener (only for currentTabId)
+// tabs.onUpdated listener (only for currentTabId)
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   // ignore other tabs
   if (tabId !== currentTabId) return;
