@@ -3,110 +3,119 @@ import { getPAInfo } from "./func/pt-pa-info.js";
 import { downloadPA, waitForDownloadFilename } from "./func/pa-downloader.js";
 import { findEmaPatient } from "./func/pt-ema.js";
 
-// Utility: convert File → base64 (unused here but handy)
+// Utility function to convert file to base64 (not used in this code but might be useful)
 const fileToBase64 = file =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result.split(",")[1]);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
+    new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            const base64 = reader.result.split(",")[1];
+            resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
 
-// Track which PAs are in progress or done
 const processedPA = new Set();
 const processingPA = new Set();
 
-// Track the tab where the user is focused
-let currentTabId = null;
-
-// On extension startup: find active tab in current window
-chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
-  if (tabs[0]) currentTabId = tabs[0].id;
-});
-
-// Update currentTabId when the user switches tabs
-chrome.tabs.onActivated.addListener(activeInfo => {
-  currentTabId = activeInfo.tabId;
-});
-
-// Update currentTabId when the window focus changes
-chrome.windows.onFocusChanged.addListener(windowId => {
-  if (windowId === chrome.windows.WINDOW_ID_NONE) return;
-  chrome.tabs.query({ active: true, windowId }, tabs => {
-    if (tabs[0]) currentTabId = tabs[0].id;
-  });
-});
-
-// Encapsulated download flow
-function processAndDownload(pa_id) {
-  if (processingPA.has(pa_id) || processedPA.has(pa_id)) return;
-  processingPA.add(pa_id);
-
-  getPAInfo(pa_id)
-    .then(pa_info => {
-      const { patient_fname, patient_lname, drug } = pa_info;
-      return downloadPA(pa_id, patient_fname, patient_lname, drug);
-    })
-    .then(downloadedID => waitForDownloadFilename(downloadedID))
-    .then(filepath => {
-      console.log("PDF path:", filepath);
-      processedPA.add(pa_id);
-
-      chrome.storage.local.get(["downloadHistory"], result => {
-        const history = [filepath]
-          .concat(result.downloadHistory || [])
-          .slice(0, 10);
-        chrome.storage.local.set({ downloadHistory: history });
-      });
-    })
-    .catch(err => console.error(`Error downloading PA ${pa_id}:`, err))
-    .finally(() => processingPA.delete(pa_id));
-}
-
-// webRequest listener (only for currentTabId)
+// handle function to listen and download pa 
 function handlePARequest(details) {
-  // ignore requests from other tabs
-  if (details.tabId !== currentTabId) return;
+    let pa_id;
+    if (
+        details.url.includes('dashboard.covermymeds.com/api/requests/') || 
+        details.url.includes('www.covermymeds.com/request/faxconfirmation/')
+    ) {
+        // extracting pa id
+        const url_parts = details.url.split('/');
+        pa_id = url_parts[5];
+        if (pa_id.includes("?")) {
+            pa_id = pa_id.split("?")[0];
+        }
+    }
 
-  let pa_id = null;
-  if (details.url.includes("dashboard.covermymeds.com/api/requests/")) {
-    pa_id = details.url.split("/")[5].split("?")[0];
-  }
-  if (!pa_id) return;
+    if (!pa_id || processedPA.has(pa_id) || processingPA.has(pa_id)) {
+        return;
+    }
 
-  processAndDownload(pa_id);
+    processingPA.add(pa_id);
+
+    // getting pa info
+    getPAInfo(pa_id)
+        .then((pa_info) => {
+            const patient_fname = pa_info.patient_fname;
+            const patient_lname = pa_info.patient_lname;
+            const patient_dob = pa_info.patient_dob;
+            const drug = pa_info.drug;
+            const submitted_by = pa_info.submitted_by;
+            const epa_status = pa_info.epa_status;
+
+            console.log(patient_fname, patient_lname, drug);
+            console.log("Submitted by: ", submitted_by);
+            console.log("ePA status: ", epa_status);
+            console.log("Details: ", details);
+
+            if (
+                epa_status === "PA Request - Sent to Plan" ||
+                details.url.includes(`covermymeds.com/request/faxconfirmation/${pa_id}`)
+            ) {
+                processedPA.add(pa_id);
+
+                downloadPA(pa_id, patient_fname, patient_lname, drug)
+                    .then(downloadedID => {
+                        return waitForDownloadFilename(downloadedID);
+                    })
+                    .then(filepath => {
+                        console.log("PDF path: ", filepath);
+                        // stop listening after one successful case
+                        console.log("Listener removed.");
+
+                        // Update history in storage
+                        chrome.storage.local.get(['downloadHistory'], result => {
+                            let history = result.downloadHistory || [];
+                            history.unshift(filepath); // add to front
+                            history = history.slice(0, 10); // keep only last 10
+                            chrome.storage.local.set({ downloadHistory: history });
+                        });
+                    });
+            }
+        })
+        .catch(error => {
+            console.error(`Error processing pa ${pa_id}: `, error)
+        })
+        .finally(() => {
+            processingPA.delete(pa_id);
+        })
 }
 
+// Attach the listener for API responses from the dashboard
 chrome.webRequest.onCompleted.addListener(
-  handlePARequest,
-  {
-    urls: [
-      "*://dashboard.covermymeds.com/api/requests/*",
-      "*://www.covermymeds.com/request/*"
-    ]
-  }
+    handlePARequest,
+    { urls: ["*://dashboard.covermymeds.com/api/requests/*", "*://www.covermymeds.com/request/*"] }
 );
 
-// tabs.onUpdated listener (only for currentTabId)
-chrome.webNavigation.onHistoryStateUpdated.addListener((details) => {
-  // only look at our active tab
-  if (details.tabId !== currentTabId) return;
-
-  const url = details.url;
-  const match = url.match(/\/request\/faxconfirmation\/([^/?#]+)/);
-  if (!match) return;
-
-  const pa_id = match[1];
-  console.log("webNavigation pa_id: ", pa_id)
-  processAndDownload(pa_id);
-}, {
-  // filter to only run on covermymeds domains
-  url: [
-    { hostContains: "covermymeds.com", pathContains: "/request/faxconfirmation/" }
-  ]
-});
-
-// Optional: manual trigger
 function pdfManipulation(pa_id) {
-  processAndDownload(pa_id);
+    getPAInfo(pa_id).then((pa_info) => {
+        const patient_fname = pa_info.patient_fname;
+        const patient_lname = pa_info.patient_lname;
+        const patient_dob = pa_info.patient_dob;
+        const drug = pa_info.drug;
+        const submitted_by = pa_info.submitted_by;
+        const epa_status = pa_info.epa_status;
+
+        console.log(patient_fname, patient_lname, drug);
+
+        // TODO: sanitize patietn names and dob
+        // dob should be stored in safeDOB as mm-dd-yyyy
+        // check if any name is a compound, then split with '-'
+
+        // download PA
+        downloadPA(pa_id, patient_fname, patient_lname, drug)
+            .then(downloadedID => {
+                // waiting for download to complete and get a filepath
+                return waitForDownloadFilename(downloadedID);
+            })
+            .then(filepath => {
+                console.log("PDF path: ", filepath);
+            })
+    });
 }
