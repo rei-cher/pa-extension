@@ -7,10 +7,7 @@ import { findEmaPatient } from "./func/pt-ema.js";
 const fileToBase64 = file =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => {
-      const base64 = reader.result.split(",")[1];
-      resolve(base64);
-    };
+    reader.onload = () => resolve(reader.result.split(",")[1]);
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
@@ -19,7 +16,28 @@ const fileToBase64 = file =>
 const processedPA = new Set();
 const processingPA = new Set();
 
-// Core download flow, given a pa_id
+// Track the tab where the user is focused
+let currentTabId = null;
+
+// On extension startup: find active tab in current window
+chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
+  if (tabs[0]) currentTabId = tabs[0].id;
+});
+
+// Update currentTabId when the user switches tabs
+chrome.tabs.onActivated.addListener(activeInfo => {
+  currentTabId = activeInfo.tabId;
+});
+
+// Update currentTabId when the window focus changes
+chrome.windows.onFocusChanged.addListener(windowId => {
+  if (windowId === chrome.windows.WINDOW_ID_NONE) return;
+  chrome.tabs.query({ active: true, windowId }, tabs => {
+    if (tabs[0]) currentTabId = tabs[0].id;
+  });
+});
+
+// Encapsulated download flow
 function processAndDownload(pa_id) {
   if (processingPA.has(pa_id) || processedPA.has(pa_id)) return;
   processingPA.add(pa_id);
@@ -34,37 +52,29 @@ function processAndDownload(pa_id) {
       console.log("PDF path:", filepath);
       processedPA.add(pa_id);
 
-      // keep only the last 10 entries
-      chrome.storage.local.get(['downloadHistory'], result => {
+      chrome.storage.local.get(["downloadHistory"], result => {
         const history = [filepath]
           .concat(result.downloadHistory || [])
           .slice(0, 10);
         chrome.storage.local.set({ downloadHistory: history });
       });
     })
-    .catch(err => {
-      console.error(`Error downloading PA ${pa_id}:`, err);
-    })
-    .finally(() => {
-      processingPA.delete(pa_id);
-    });
+    .catch(err => console.error(`Error downloading PA ${pa_id}:`, err))
+    .finally(() => processingPA.delete(pa_id));
 }
 
-// 1) Listen for API responses in the dashboard that contain pa_id
+// 1) webRequest listener (only for currentTabId)
 function handlePARequest(details) {
-  let pa_id;
-  if (
-    details.url.includes('dashboard.covermymeds.com/api/requests/') ||
-    details.url.includes('www.covermymeds.com/request/faxconfirmation/')
-  ) {
-    // extract the ID segment
-    const parts = details.url.split('/');
-    pa_id = parts[5].split('?')[0];
-  }
+  // ignore requests from other tabs
+  if (details.tabId !== currentTabId) return;
 
-  if (pa_id) {
-    processAndDownload(pa_id);
+  let pa_id = null;
+  if (details.url.includes("dashboard.covermymeds.com/api/requests/")) {
+    pa_id = details.url.split("/")[5].split("?")[0];
   }
+  if (!pa_id) return;
+
+  processAndDownload(pa_id);
 }
 
 chrome.webRequest.onCompleted.addListener(
@@ -77,9 +87,10 @@ chrome.webRequest.onCompleted.addListener(
   }
 );
 
-// 2) Also catch when the user actually navigates to the fax-confirmation page
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  // only fire when the URL changes
+// 2) tabs.onUpdated listener (only for currentTabId)
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  // ignore other tabs
+  if (tabId !== currentTabId) return;
   if (!changeInfo.url) return;
 
   const match = changeInfo.url.match(/\/request\/faxconfirmation\/([^/?#]+)/);
@@ -89,7 +100,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   processAndDownload(pa_id);
 });
 
-// Optional: if you want a manual trigger somewhere
+// Optional: manual trigger
 function pdfManipulation(pa_id) {
   processAndDownload(pa_id);
 }
