@@ -88,16 +88,21 @@ chrome.webRequest.onCompleted.addListener(
 );
 
 // tabs.onUpdated listener (only for currentTabId)
-chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
-  // ignore other tabs
-  if (tabId !== currentTabId) return;
-  if (!changeInfo.url) return;
+chrome.webNavigation.onHistoryStateUpdated.addListener((details) => {
+  // only look at our active tab
+  if (details.tabId !== currentTabId) return;
 
-  const match = changeInfo.url.match(/\/request\/faxconfirmation\/([^/?#]+)/);
+  const url = details.url;
+  const match = url.match(/\/request\/faxconfirmation\/([^/?#]+)/);
   if (!match) return;
 
   const pa_id = match[1];
   processAndDownload(pa_id);
+}, {
+  // filter to only run on covermymeds domains
+  url: [
+    { hostContains: "covermymeds.com", pathContains: "/request/faxconfirmation/" }
+  ]
 });
 
 // Optional: manual trigger
