@@ -1,4 +1,4 @@
-function _(s) {
+function b(s) {
   if (s.patient_dob) return s.patient_dob;
   for (const t of s.sections || [])
     for (const e of t.rows || [])
@@ -9,7 +9,7 @@ function _(s) {
       }
   return null;
 }
-async function f(s) {
+async function P(s) {
   console.log(`Getting patient info with ID - ${s}`);
   const t = `https://dashboard.covermymeds.com/api/requests/${s}?`;
   try {
@@ -26,53 +26,108 @@ async function f(s) {
     return console.log("PA data:", o), {
       patient_fname: o.patient_fname,
       patient_lname: o.patient_lname,
-      patient_dob: _(o),
+      patient_dob: b(o),
       drug: o.drug.split(" ")[0],
       submitted_by: o.submitted_by,
       epa_status: o.ePA_Status_description,
       workflow_status: o.workflow_status,
-      submitted_by_user_category: o.submitted_by_user_category
+      submitted_by_user_category: o.submitted_by_user_category,
+      completed: o.completed
     };
   } catch (e) {
     throw console.error("Error fetching PA info:", e), e;
   }
 }
-async function b(s, t, e, o) {
+async function A(s, t, e, o) {
   return new Promise((n) => {
-    const a = `https://dashboard.covermymeds.com/api/requests/${s}/download`;
+    const u = `https://dashboard.covermymeds.com/api/requests/${s}/download`;
     console.log("downloadPA called"), chrome.downloads.download({
-      url: a,
+      url: u,
       filename: `${t}-${e}-${o}.pdf`
-    }, (r) => {
-      console.log("Download started, id=", r), r && n(r);
+    }, (a) => {
+      console.log("Download started, id=", a), a && n(a);
     });
   });
 }
-function h(s) {
+function $(s) {
   return new Promise((t, e) => {
   });
 }
-const d = /* @__PURE__ */ new Set(), u = /* @__PURE__ */ new Set();
+async function q(s, t, e) {
+  console.log(`Trying to find the patient in ema: ${t} ${e} ${s}`);
+  const o = "https://khasak.ema.md/ema/ws/v3/patients/search?";
+  try {
+    const n = {
+      term: s,
+      selector: "lastName,firstName,fullName,mrn,pmsId,dateOfBirth,encryptedId",
+      "sorting.sortBy": "lastName,firstName",
+      "sorting.sortOrder": "asc",
+      "paging.pageSize": 25
+    }, u = new URLSearchParams(n).toString(), a = await fetch(`${o}${u}`, {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        Accept: "application/json"
+      }
+    });
+    if (!a.ok)
+      throw new Error(`HTTP ${a.status}`);
+    const c = await a.json();
+    console.log("EMA patient return data:", c);
+    const l = Array.isArray(c) ? c : Array.isArray(c.patients) ? c.patients : [], h = t.toLowerCase().split(/\s+|-/).filter((r) => r), g = e.toLowerCase().split(/\s+|-/).filter((r) => r), m = l.filter((r) => {
+      const d = [
+        r.firstName || "",
+        r.lastName || "",
+        r.fullName || ""
+      ].join(" ").toLowerCase(), i = h.some((w) => d.includes(w)), _ = g.some((w) => d.includes(w));
+      return i && _;
+    });
+    return console.log("Matched patients:", m), m;
+  } catch (n) {
+    throw console.error(`Error fetching user in ema: ${n}`), n;
+  }
+}
+const f = /* @__PURE__ */ new Set(), p = /* @__PURE__ */ new Set();
 function y(s) {
   let t;
-  (s.url.includes("dashboard.covermymeds.com/api/requests/") || s.url.includes("www.covermymeds.com/request/faxconfirmation/")) && (t = s.url.split("/")[5], t.includes("?") && (t = t.split("?")[0])), !(!t || d.has(t) || u.has(t)) && (u.add(t), f(t).then((e) => {
-    const o = e.patient_fname, n = e.patient_lname;
-    e.patient_dob;
-    const a = e.drug, r = e.submitted_by, c = e.epa_status, m = e.workflow_status, w = e.submitted_by_user_category;
-    console.log(o, n, a), console.log("Submitted by: ", r), console.log("ePA status: ", c), console.log("Details: ", s), c === "PA Request - Sent to Plan" || // checking status for pas that are sent, but didn't go to the faxconfirmation page
-    w === "PRESCRIBER" ? (d.add(t), b(t, o, n, a).then((i) => h()).then((i) => {
-      console.log("PDF path: ", i), console.log("Listener removed."), chrome.storage.local.get(["downloadHistory"], (p) => {
-        let l = p.downloadHistory || [];
-        l.unshift(i), l = l.slice(0, 10), chrome.storage.local.set({ downloadHistory: l });
+  (s.url.includes("dashboard.covermymeds.com/api/requests/") || s.url.includes("www.covermymeds.com/request/faxconfirmation/")) && (t = s.url.split("/")[5], t.includes("?") && (t = t.split("?")[0])), !(!t || f.has(t) || p.has(t)) && (p.add(t), P(t).then((e) => {
+    const {
+      patient_fname: o,
+      patient_lname: n,
+      patient_dob: u,
+      drug: a,
+      submitted_by: c,
+      epa_status: l,
+      workflow_status: h,
+      submitted_by_user_category: g,
+      completed: m
+    } = e;
+    console.log(o, n, a), console.log("Submitted by: ", c), console.log("ePA status: ", l), console.log("Details: ", s), l === "PA Request - Sent to Plan" || // checking status for pas that are sent, but didn't go to the faxconfirmation page
+    s.url.includes(`faxconfirmation/${t}`) ? (f.add(t), A(t, o, n, a).then((r) => $()).then((r) => {
+      console.log("PDF path: ", r), console.log("Listener removed."), chrome.storage.local.get(["downloadHistory"], (d) => {
+        let i = d.downloadHistory || [];
+        i.unshift(r), i = i.slice(0, 10), chrome.storage.local.set({ downloadHistory: i });
       });
-    })) : (c === "PA Response" || c === "Question Response" || m === "Sent to Plan") && d.add(t);
+    }).then((r, d, i) => q(r, d, i)).then((r) => {
+      console.log("Ema Patient: ", r);
+    })) : (l === "PA Response" || l === "Question Response" && m !== "false" || h === "Sent to Plan") && f.add(t);
   }).catch((e) => {
     console.error(`Error processing pa ${t}: `, e);
   }).finally(() => {
-    u.delete(t);
+    p.delete(t);
   }));
 }
 chrome.webRequest.onCompleted.addListener(
   y,
   { urls: ["*://dashboard.covermymeds.com/api/requests/*", "*://www.covermymeds.com/request/*"] }
 );
+chrome.webNavigation.onHistoryStateUpdated.addListener((s) => {
+  const t = s.url.match(/faxconfirmation\/([^/?#]+)/);
+  if (t) {
+    const e = t[1];
+    if (f.has(e) || p.has(e)) return;
+    console.log("Detected faxconfirmation URL change for PA ID:", e), y({ url: s.url, tabId: s.tabId });
+  }
+}, {
+  url: [{ urlMatches: "https://www.covermymeds.com/request/faxconfirmation/" }]
+});

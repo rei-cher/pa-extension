@@ -39,17 +39,22 @@ function handlePARequest(details) {
 
     processingPA.add(pa_id);
 
+    let g_filepath = null;
+
     // getting pa info
     getPAInfo(pa_id)
         .then((pa_info) => {
-            const patient_fname = pa_info.patient_fname;
-            const patient_lname = pa_info.patient_lname;
-            const patient_dob = pa_info.patient_dob;
-            const drug = pa_info.drug;
-            const submitted_by = pa_info.submitted_by;
-            const epa_status = pa_info.epa_status;
-            const workflow_status = pa_info.workflow_status;
-            const submitted_by_user_category = pa_info.submitted_by_user_category;
+            const {
+                patient_fname,
+                patient_lname,
+                patient_dob,
+                drug,
+                submitted_by,
+                epa_status,
+                workflow_status,
+                submitted_by_user_category,
+                completed
+            } = pa_info;
 
             console.log(patient_fname, patient_lname, drug);
             console.log("Submitted by: ", submitted_by);
@@ -58,7 +63,7 @@ function handlePARequest(details) {
 
             if (
                 epa_status === "PA Request - Sent to Plan" ||   // checking status for pas that are sent, but didn't go to the faxconfirmation page
-                submitted_by_user_category === "PRESCRIBER"     // checking for fax being sent for pas that are went to faxconfirmation page (NOTE: from url *request/faxconfirmation/*)
+                details.url.includes(`faxconfirmation/${pa_id}`)    // checking for fax being sent for pas that are went to faxconfirmation page (NOTE: from url *request/faxconfirmation/*)
             ) {
                 processedPA.add(pa_id);
 
@@ -78,11 +83,17 @@ function handlePARequest(details) {
                             history = history.slice(0, 10); // keep only last 10
                             chrome.storage.local.set({ downloadHistory: history });
                         });
-                    });
+                    })
+                    .then((patient_dob, patient_fname, patient_lname) => {
+                        return findEmaPatient(patient_dob, patient_fname, patient_lname);
+                    })
+                    .then(match => {
+                        console.log("Ema Patient: ", match)
+                    })
             }
             else if (
                 epa_status === "PA Response" ||
-                epa_status === "Question Response" ||
+                (epa_status === "Question Response" && completed !== "false") ||
                 workflow_status === "Sent to Plan"
             ) {
                 processedPA.add(pa_id);
@@ -101,6 +112,22 @@ chrome.webRequest.onCompleted.addListener(
     handlePARequest,
     { urls: ["*://dashboard.covermymeds.com/api/requests/*", "*://www.covermymeds.com/request/*"] }
 );
+
+// Monitor for url change to faxconfirmation
+chrome.webNavigation.onHistoryStateUpdated.addListener((details) => {
+    const match = details.url.match(/faxconfirmation\/([^/?#]+)/);
+    if (match) {
+        const pa_id = match[1];
+
+        if (processedPA.has(pa_id) || processingPA.has(pa_id)) return;
+
+        console.log("Detected faxconfirmation URL change for PA ID:", pa_id);
+
+        handlePARequest({ url: details.url, tabId: details.tabId });
+    }
+}, {
+    url: [{ urlMatches: "https://www.covermymeds.com/request/faxconfirmation/" }]
+});
 
 function pdfManipulation(pa_id) {
     getPAInfo(pa_id).then((pa_info) => {

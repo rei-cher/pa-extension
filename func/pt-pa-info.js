@@ -45,7 +45,8 @@ export async function getPAInfo(pa_id) {
         submitted_by: data.submitted_by,
         epa_status: data.ePA_Status_description,
         workflow_status: data.workflow_status,
-        submitted_by_user_category: data.submitted_by_user_category
+        submitted_by_user_category: data.submitted_by_user_category,
+        completed: data.completed
       };
       
     } 
