@@ -19,6 +19,13 @@ function skipPA(pa_info) {
     // status_dialog.includes("You may close this dialog and return to your dashboard to perform other")
 }
 
+setInterval(() => {
+    console.log("===Processed PAs===");
+    for (const [pa_id, state] of processedPA.entries()){
+        console.log(`PA id: ${pa_id}: downloaded - ${state.downloaded}`);
+    }
+}, 30000)
+
 async function handlePARequest(details) {
     // Extract PA ID from URL
     let pa_id;
@@ -31,6 +38,12 @@ async function handlePARequest(details) {
     }
 
     if (!pa_id || processingPA.has(pa_id)) return;
+
+    const state = processedPA.get(pa_id);
+    if (state?.downloaded) {
+        console.log(`[PA ${pa_id}] Ignored`);
+        return;
+    }
 
     processingPA.add(pa_id);
 
@@ -50,7 +63,9 @@ async function handlePARequest(details) {
             epa_status,
             workflow_status,
             submitted_by_user_category,
-            completed
+            completed,
+            status_dialog,
+            status_dialog_loading
         } = pa_info;
 
         console.log("Processing PA:", pa_id, patient_fname, patient_lname, drug);
@@ -62,7 +77,8 @@ async function handlePARequest(details) {
         const isTerminalCase =
             epa_status === "PA Response" ||
             (epa_status === "Question Response" && completed !== "false") ||
-            workflow_status === "Sent to Plan";
+            workflow_status === "Sent to Plan" ||
+            (epa_status === "PA Request - Sent to Plan" && status_dialog_loading.length);
 
         if (!processedPA.get(pa_id).downloaded && (isUploadCase || isTerminalCase)) {
             const downloadId = await downloadPA(pa_id, patient_fname, patient_lname, drug);
@@ -119,6 +135,9 @@ async function handlePARequest(details) {
                     }
                 }
             }
+        }
+        else {
+            return;
         }
     } catch (error) {
         console.error(`[PA ${pa_id}] Error:`, error);
