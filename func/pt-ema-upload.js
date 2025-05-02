@@ -45,6 +45,4 @@ export async function uploadPdf({ patientId, patientLname, patientFname, drug, f
       const text = await resp.text();
       throw new Error(`Upload failed ${resp.status}: ${text}`);
     }
-  
-    return resp.json();
 }

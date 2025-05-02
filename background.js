@@ -1,7 +1,7 @@
-import { getCookie } from "./func/cmm-cookie.js";
 import { getPAInfo } from "./func/pt-pa-info.js";
 import { downloadPA, waitForDownloadFilename } from "./func/pa-downloader.js";
 import { findEmaPatient } from "./func/pt-ema.js";
+import { uploadPdf } from "./func/pt-ema-upload.js";
 
 // Utilities
 const processedPA = new Set();
@@ -77,6 +77,49 @@ async function handlePARequest(details) {
             // Find EMA patient
             const matches = await findEmaPatient(patient_dob, patient_fname, patient_lname);
             console.log("Ema Patient:", matches);
+
+            // Upload to found patient in ema
+            if (matches && matches.length) {
+                const { id: patientId } = matches[0];
+                console.log(`[PA ${pa_id}] uploading PDF for patientId=${patientId}`);
+
+                try {
+                    // Fetch PDF again over HTTPS (avoiding file://)
+                    console.log(`[PA ${pa_id}] fetching PDF over network for upload`);
+                    const resp = await fetch(
+                        `https://dashboard.covermymeds.com/api/requests/${pa_id}/download`,
+                        { credentials: 'include' }
+                    );
+
+                    if (!resp.ok) {
+                        throw new Error(`PDF fetch failed ${resp.status}: ${resp.statusText}`);
+                    }
+
+                    const pdfBlob = await resp.blob();
+                    const fileName = `${patient_fname}-${patient_lname}-${drug}.pdf`;
+                    const fileObj = new File([pdfBlob], fileName, { type: 'application/pdf' });
+
+                    const dto = [{
+                        patient: { id: patientId, lastName: patient_lname, firstName: patient_fname },
+                        additionalInfo: { performedDate: new Date().toISOString() },
+                        fileName: fileObj.name,
+                        title: `${drug} pa submitted: ${new Date().toLocaleDateString()}`
+                    }];
+
+                    console.log(`[PA ${pa_id}] uploading to EMA for patient ${patientId}`);
+                    const uploadResult = await uploadPdf({
+                        patientId,
+                        patientLname: patient_lname,
+                        patientFname: patient_fname,
+                        drug,
+                        file: fileObj
+                    });
+
+                    console.log(`[PA ${pa_id}] EMA upload result:`, uploadResult);
+                } catch (fileErr) {
+                    console.error(`[PA ${pa_id}] local file→EMA error:`, fileErr);
+                }
+            }
         }
         else if (
             epa_status === "PA Response" ||

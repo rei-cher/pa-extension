@@ -1,31 +1,21 @@
 [
-    {
-      "id": 1,
-      "priority": 1,
-      "action": {
-        "type": "modifyHeaders",
-        "responseHeaders": [
-          {
-            "header": "access-control-allow-origin",
-            "operation": "set",
-            "value": "*"
-          },
-          {
-            "header": "access-control-allow-methods",
-            "operation": "set",
-            "value": "GET, POST, OPTIONS"
-          },
-          {
-            "header": "access-control-allow-headers",
-            "operation": "set",
-            "value": "*"
-          }
-        ]
-      },
-      "condition": {
-        "urlFilter": "*://khasak.ema.md/ema/ws/v3/fileAttachment/upload*",
-        "resourceTypes": ["xmlhttprequest"]
-      }
+  {
+    "id": 1,
+    "priority": 1,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        {
+          "header": "Origin",
+          "operation": "remove"
+        }
+      ]
+    },
+    "condition": {
+      "urlFilter": "https://khasak.ema.md/ema/ws/v3/fileAttachment/upload",
+      "resourceTypes": [
+        "xmlhttprequest"
+      ]
     }
-  ]
-  
+  }
+]

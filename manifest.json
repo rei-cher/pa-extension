@@ -19,9 +19,9 @@
         "*://*.ema.md/*",
         "*://www.covermymeds.com/*"
     ],
-    "declarative_net_request": {
-        "rule_resources": [{
-            "id": "cors_rules",
+    "declarative_net_request" : {
+        "rule_resources" : [{
+            "id": "cors",
             "enabled": true,
             "path": "cors_rules.json"
         }]
