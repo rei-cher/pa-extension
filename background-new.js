@@ -7,6 +7,18 @@ import { uploadPdf } from "./func/pt-ema-upload.js";
 const processedPA = new Map(); // pa_id => { downloaded: boolean }
 const processingPA = new Set();
 
+function skipPA(pa_info) {
+    const {
+        epa_status, 
+        workflow_status,
+        status_dialog,
+        status_dialog_loading
+    } = pa_info;
+
+    // status_dialog_loading.includes("is unable to respond with clinical questions")
+    // status_dialog.includes("You may close this dialog and return to your dashboard to perform other")
+}
+
 async function handlePARequest(details) {
     // Extract PA ID from URL
     let pa_id;
