@@ -118,7 +118,7 @@ async function handlePARequest(details) {
 // Listener for PA requests
 chrome.webRequest.onCompleted.addListener(
     handlePARequest,
-    { urls: ["*://dashboard.covermymeds.com/api/requests/*", "*://www.covermymeds.com/request/*"] }
+    { urls: ["*://*.covermymeds.com/*"] }
 );
 
 // Optional: manually trigger for testing

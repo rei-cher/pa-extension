@@ -15,9 +15,8 @@
     ],
     "host_permissions": [
         "*://portal-services.covermymeds.com/*",
-        "*://dashboard.covermymeds.com/*",
-        "*://*.ema.md/*",
-        "*://www.covermymeds.com/*"
+        "*://*.covermymeds.com/*",
+        "*://*.ema.md/*"
     ],
     "declarative_net_request" : {
         "rule_resources" : [{
