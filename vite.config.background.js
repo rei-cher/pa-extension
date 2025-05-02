@@ -7,7 +7,7 @@ export default defineConfig({
     emptyOutDir: true,
     outDir: 'dist',
     lib: {
-      entry: resolve(__dirname, 'background.js'),
+      entry: resolve(__dirname, 'background-new.js'),
       formats: ['es'],
       fileName: () => 'background.bundle.js',
       name: 'background'
