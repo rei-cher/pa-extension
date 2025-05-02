@@ -1,48 +1,50 @@
-export async function uploadPdf({ patientId, patientLname, patientFname, drug, file}) {
-    if (!(file instanceof Blob)) {
-        throw new Error("`file` must be a Blob or File");
-    }
+export async function uploadPdf(tabId, dtoList, file) {
+  const formData = new FormData();
 
-    console.log("Upload PDF called");
-    
-    // build your dtoList JSON
-    const dto = [{
-      patient: {
-        id: patientId,
-        lastName: patientLname,
-        firstName: patientFname
-      },
-      additionalInfo: {
-        performedDate: new Date().toISOString()
-      },
-      fileName: file.name,
-      title: `${drug} pa submitted: ${new Date().toLocaleDateString()}`
-    }];
-  
-    // create a FormData instance
-    const formData = new FormData();
-  
-    // append the JSON part as its own blob so that Content-Type is set to application/json
-    formData.append(
-      "dtoList",
-      new Blob([JSON.stringify(dto)], { type: "application/json" }),
-      "dtoList.json"
-    );
-  
-    // append the actual PDF file
-    formData.append("files", file, file.name);
-  
-    // pOST with fetch
-    const resp = await fetch("https://khasak.ema.md/ema/ws/v3/fileAttachment/upload",
-        {
-            method: "POST",
-            credentials: 'include',
-            body: formData,
-        }
-    );
-  
-    if (!resp.ok) {
-      const text = await resp.text();
-      throw new Error(`Upload failed ${resp.status}: ${text}`);
+  // Ensure dtoList is an array of objects and wrap it in a JSON Blob
+  formData.append(
+    "dtoList",
+    new Blob([JSON.stringify(dtoList)], { type: "application/json" })
+  );
+
+  // Ensure file is a Blob or File (e.g., from input or fetched file)
+  formData.append("file", file, file.name);
+
+  chrome.scripting.executeScript({
+    target: { tabId },
+    func: async (formDataSerialized) => {
+      const formData = new FormData();
+
+      // Reconstruct dtoList and file
+      formData.append(
+        "dtoList",
+        new Blob([formDataSerialized.dtoList], { type: "application/json" })
+      );
+      formData.append(
+        "file",
+        new Blob([Uint8Array.from(formDataSerialized.fileData)], { type: formDataSerialized.fileType }),
+        formDataSerialized.fileName
+      );
+
+      const response = await fetch("https://your-api-endpoint.com/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const result = await response.json();
+      return result;
+    },
+    args: [{
+      dtoList: JSON.stringify(dtoList),
+      fileData: Array.from(new Uint8Array(await file.arrayBuffer())), // serialize file bytes
+      fileType: file.type,
+      fileName: file.name
+    }]
+  }, (results) => {
+    if (chrome.runtime.lastError) {
+      console.error("Script injection error:", chrome.runtime.lastError);
+    } else {
+      console.log("Upload result:", results[0].result);
     }
+  });
 }
