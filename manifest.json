@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "Prior Authorization Autoupload",
-    "version": "1.1.0",
+    "version": "1.2.1",
     "description": "Auto dowload, rename, and upload faxed PA from covermymeds into emd.md",
     "permissions": [
         "tabs", 
