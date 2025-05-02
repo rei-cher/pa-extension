@@ -4,8 +4,27 @@ import { findEmaPatient } from "./func/pt-ema.js";
 import { uploadPdf } from "./func/pt-ema-upload.js";
 
 // Utilities
-const processedPA = new Set();
+const processedPA = new Map(); // pa_id => { downloaded: boolean }
 const processingPA = new Set();
+
+function skipPA(pa_info) {
+    const {
+        epa_status, 
+        workflow_status,
+        status_dialog,
+        status_dialog_loading
+    } = pa_info;
+
+    // status_dialog_loading.includes("is unable to respond with clinical questions")
+    // status_dialog.includes("You may close this dialog and return to your dashboard to perform other")
+}
+
+setInterval(() => {
+    console.log("===Processed PAs===");
+    for (const [pa_id, state] of processedPA.entries()){
+        console.log(`PA id: ${pa_id}: downloaded - ${state.downloaded}`);
+    }
+}, 30000)
 
 async function handlePARequest(details) {
     // Extract PA ID from URL
@@ -18,11 +37,22 @@ async function handlePARequest(details) {
         pa_id = parts[5].split('?')[0];
     }
 
-    if (!pa_id || processedPA.has(pa_id) || processingPA.has(pa_id)) return;
+    if (!pa_id || processingPA.has(pa_id)) return;
+
+    const state = processedPA.get(pa_id);
+    if (state?.downloaded) {
+        console.log(`[PA ${pa_id}] Ignored`);
+        return;
+    }
+
     processingPA.add(pa_id);
 
     try {
-        // Fetch PA info
+        // Add to processedPA if not tracked yet
+        if (!processedPA.has(pa_id)) {
+            processedPA.set(pa_id, { downloaded: false });
+        }
+
         const pa_info = await getPAInfo(pa_id);
         const {
             patient_fname,
@@ -33,156 +63,105 @@ async function handlePARequest(details) {
             epa_status,
             workflow_status,
             submitted_by_user_category,
-            completed
+            completed,
+            status_dialog,
+            status_dialog_loading
         } = pa_info;
 
-        console.log(patient_fname, patient_lname, drug);
-        console.log("Submitted by:", submitted_by);
-        console.log("ePA status:", epa_status);
-        console.log("Details:", details);
+        console.log("Processing PA:", pa_id, patient_fname, patient_lname, drug);
 
-        if (
+        const isUploadCase =
             epa_status === "PA Request - Sent to Plan" ||
-            details.url.includes(`faxconfirmation/${pa_id}`)
-        ) {
-            // Mark as processed
-            processedPA.add(pa_id);
+            details.url.includes(`faxconfirmation/${pa_id}`);
 
-            // Download and wait for file
-            const downloadId = await downloadPA(pa_id, patient_fname, patient_lname, drug);
-            
-            let filepath;
-            
-            try{
-                filepath = await waitForDownloadFilename(downloadId);
-                console.log("Download completed");
-            }
-            catch (error) {
-                console.error("Error downloading: ", error);
-            }
-
-            console.log("PDF path:", filepath);
-            console.log("Listener removed.");
-
-            // Update download history (keep last 10)
-            // await new Promise(resolve => {
-            //     chrome.storage.local.get(['downloadHistory'], result => {
-            //         let history = result.downloadHistory || [];
-            //         history.unshift(filepath);
-            //         history = history.slice(0, 10);
-            //         chrome.storage.local.set({ downloadHistory: history }, resolve);
-            //     });
-            // });
-
-            // Find EMA patient
-            const matches = await findEmaPatient(patient_dob, patient_fname, patient_lname);
-            console.log("Ema Patient:", matches);
-
-            // Upload to found patient in ema
-            if (matches && matches.length) {
-                const { id: patientId } = matches[0];
-                console.log(`[PA ${pa_id}] uploading PDF for patientId=${patientId}`);
-
-                let emaTabId = null;
-                // find ema tab id
-                try {
-                    const tabs = await chrome.tabs.query({});
-                    const emaTab = tabs.find(t => t.url && t.url.includes('ema.md'));
-                    if (emaTab) {
-                        emaTabId = emaTab.id;
-                        console.log(`[PA ${pa_id}] Found EMA tab ID:`, emaTabId);
-                    } else {
-                        console.warn(`[PA ${pa_id}] No EMA tab found`);
-                    }
-                } catch (tabErr) {
-                    console.error(`[PA ${pa_id}] Error finding EMA tab:`, tabErr);
-                }
-
-                // upload only if emaTabId exists
-                if (emaTabId){
-                    try {
-                        // Fetch PDF again over HTTPS (avoiding file://)
-                        console.log(`[PA ${pa_id}] fetching PDF over network for upload`);
-                        const resp = await fetch(
-                            `https://dashboard.covermymeds.com/api/requests/${pa_id}/download`,
-                            { credentials: 'include' }
-                        );
-    
-                        if (!resp.ok) {
-                            throw new Error(`PDF fetch failed ${resp.status}: ${resp.statusText}`);
-                        }
-    
-                        const pdfBlob = await resp.blob();
-                        const fileName = `${patient_fname}-${patient_lname}-${drug}.pdf`;
-                        const fileObj = new File([pdfBlob], fileName, { type: 'application/pdf' });
-    
-                        const dtoList = [{
-                            patient: { id: patientId, lastName: patient_lname, firstName: patient_fname },
-                            additionalInfo: { performedDate: new Date().toISOString() },
-                            fileName: fileObj.name,
-                            title: `${drug} pa submitted: ${new Date().toLocaleDateString()}`
-                        }];
-    
-                        console.log(`[PA ${pa_id}] uploading to EMA for patient ${patientId}`);
-                        const uploadResult = await uploadPdf(
-                            emaTabId, dtoList, fileObj
-                        );
-    
-                        console.log(`[PA ${pa_id}] EMA upload result:`, uploadResult);
-                    } catch (fileErr) {
-                        console.error(`[PA ${pa_id}] local file→EMA error:`, fileErr);
-                    }
-                }
-            }
-        }
-        else if (
+        const isTerminalCase =
             epa_status === "PA Response" ||
             (epa_status === "Question Response" && completed !== "false") ||
-            workflow_status === "Sent to Plan"
-        ) {
-            processedPA.add(pa_id);
+            workflow_status === "Sent to Plan" ||
+            (epa_status === "PA Request - Sent to Plan" && status_dialog_loading.length);
+
+        if (!processedPA.get(pa_id).downloaded && (isUploadCase || isTerminalCase)) {
+            const downloadId = await downloadPA(pa_id, patient_fname, patient_lname, drug);
+            const filepath = await waitForDownloadFilename(downloadId);
+            console.log(`[PA ${pa_id}] Downloaded file path:`, filepath);
+
+            // Mark as downloaded
+            processedPA.get(pa_id).downloaded = true;
+
+            if (isUploadCase) {
+                const matches = await findEmaPatient(patient_dob, patient_fname, patient_lname);
+                console.log("Ema Patient:", matches);
+
+                if (matches?.length) {
+                    const { id: patientId } = matches[0];
+                    console.log(`[PA ${pa_id}] Uploading PDF for patientId=${patientId}`);
+
+                    let emaTabId = null;
+                    try {
+                        const tabs = await chrome.tabs.query({});
+                        const emaTab = tabs.find(t => t.url?.includes('ema.md'));
+                        if (emaTab) {
+                            emaTabId = emaTab.id;
+                            console.log(`[PA ${pa_id}] Found EMA tab ID:`, emaTabId);
+                        }
+                    } catch (tabErr) {
+                        console.error(`[PA ${pa_id}] Error finding EMA tab:`, tabErr);
+                    }
+
+                    if (emaTabId) {
+                        try {
+                            const resp = await fetch(
+                                `https://dashboard.covermymeds.com/api/requests/${pa_id}/download`,
+                                { credentials: 'include' }
+                            );
+                            if (!resp.ok) throw new Error(`PDF fetch failed: ${resp.statusText}`);
+
+                            const pdfBlob = await resp.blob();
+                            const fileName = `${patient_fname}-${patient_lname}-${drug}.pdf`;
+                            const fileObj = new File([pdfBlob], fileName, { type: 'application/pdf' });
+
+                            const dtoList = [{
+                                patient: { id: patientId, lastName: patient_lname, firstName: patient_fname },
+                                additionalInfo: { performedDate: new Date().toISOString() },
+                                fileName: fileObj.name,
+                                title: `${drug} pa submitted: ${new Date().toLocaleDateString()}`
+                            }];
+
+                            const uploadResult = await uploadPdf(emaTabId, dtoList, fileObj);
+                            console.log(`[PA ${pa_id}] EMA upload result:`, uploadResult);
+                        } catch (uploadErr) {
+                            console.error(`[PA ${pa_id}] Upload error:`, uploadErr);
+                        }
+                    }
+                }
+            }
         }
-    }
-    catch (error) {
-        console.error(`Error processing pa ${pa_id}:`, error);
-    }
-    finally {
+        else {
+            return;
+        }
+    } catch (error) {
+        console.error(`[PA ${pa_id}] Error:`, error);
+    } finally {
         processingPA.delete(pa_id);
     }
 }
 
-// Listener for API responses
+// Listener for PA requests
 chrome.webRequest.onCompleted.addListener(
     handlePARequest,
-    { urls: ["*://dashboard.covermymeds.com/api/requests/*", "*://www.covermymeds.com/request/*"] }
+    { urls: ["*://*.covermymeds.com/*"] }
 );
 
-// Monitor history-state updates for faxconfirmation routes
-chrome.webNavigation.onHistoryStateUpdated.addListener((details) => {
-    const match = details.url.match(/faxconfirmation\/([^/?#]+)/);
-    if (match) {
-        const pa_id = match[1];
-        if (!processedPA.has(pa_id) && !processingPA.has(pa_id)) {
-            console.log("Detected faxconfirmation URL change for PA ID:", pa_id);
-            handlePARequest({ url: details.url, tabId: details.tabId });
-        }
-    }
-}, {
-    url: [{ urlMatches: "https://www.covermymeds.com/request/faxconfirmation/" }]
-});
-
-// Standalone PDF manipulation utility
+// Optional: manually trigger for testing
 export async function pdfManipulation(pa_id) {
     try {
         const pa_info = await getPAInfo(pa_id);
-        const { patient_fname, patient_lname, patient_dob, drug, submitted_by, epa_status } = pa_info;
-        console.log(patient_fname, patient_lname, drug);
+        const { patient_fname, patient_lname, drug } = pa_info;
 
         const downloadId = await downloadPA(pa_id, patient_fname, patient_lname, drug);
         const filepath = await waitForDownloadFilename(downloadId);
-        console.log("PDF path:", filepath);
-    }
-    catch (error) {
-        console.error(`Error in pdfManipulation for PA ID ${pa_id}:`, error);
+        console.log(`[Manual] PDF path:`, filepath);
+    } catch (error) {
+        console.error(`[Manual] Error in pdfManipulation for PA ID ${pa_id}:`, error);
     }
 }
