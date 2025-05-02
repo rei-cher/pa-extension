@@ -1,69 +1,32 @@
 export async function uploadPdf(tabId, dtoList, file) {
-    const formData = new FormData();
-
-    // Ensure dtoList is an array of objects and wrap it in a JSON Blob
-    formData.append(
-        "dtoList",
-        new Blob([JSON.stringify(dtoList)], { type: "application/json" })
-    );
-
-    // Ensure file is a Blob or File (e.g., from input or fetched file)
-    formData.append("file", file, file.name);
-
     try {
-        console.log("Executing upload sctipt in tabid: ",tabId)
-        chrome.scripting.executeScript({
-    target: { tabId },
-    func: (formDataSerialized) => {
-        return (async () => {
-            const formData = new FormData();
-            formData.append(
-                "dtoList",
-                new Blob([formDataSerialized.dtoList], { type: "application/json" })
-            );
-            formData.append(
-                "file",
-                new Blob([Uint8Array.from(formDataSerialized.fileData)], { type: formDataSerialized.fileType }),
-                formDataSerialized.fileName
-            );
+        const formData = new FormData();
 
-            try {
-                const response = await fetch("https://khasak.ema.md/ema/ws/v3/fileAttachment/upload", {
-                    method: "POST",
-                    body: formData,
-                });
+        const dtoListBlob = new Blob([JSON.stringify(dtoList)], { type: 'application/json' });
+        formData.append('dtoList', JSON.stringify(dtoListBlob));
+        
+        formData.append('file', file, file.name);
 
-                const result = await response.json();
-                return { success: true, result };
-            } catch (err) {
-                return { success: false, error: err.message };
+        // formData.append('tabId', tabId);
+
+        const response = await fetch(
+            "https://khasak.ema.md/ema/ws/v3/fileAttachment/upload", 
+            {
+                method: 'POST',
+                body: formData
             }
-        })();
-    },
-    args: [{
-        dtoList: JSON.stringify(dtoList),
-        fileData: Array.from(new Uint8Array(await file.arrayBuffer())),
-        fileType: file.type,
-        fileName: file.name
-    }]
-}, (results) => {
-    if (chrome.runtime.lastError) {
-        console.error("Script injection error:", chrome.runtime.lastError);
-    } else if (results && results[0] && results[0].result) {
-        const { success, result, error } = results[0].result;
-        if (success) {
-            console.log("Upload result:", result);
-        } else {
-            console.error("Upload failed:", error);
-        }
-    } else {
-        console.error("Upload failed: No result returned");
-    }
-});
+        );
 
-    }
+        if (!response.ok) {
+            throw new Error(`Upload failed: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+        return result;
+    } 
     catch (error) {
-        console.error("Error during uploading a pdf: ", error.message)
+        console.error('Upload error:', error);
+        throw error;
     }
 }
 
