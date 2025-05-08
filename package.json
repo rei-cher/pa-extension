@@ -13,5 +13,8 @@
   "description": "",
   "devDependencies": {
     "vite": "^6.3.3"
+  },
+  "dependencies": {
+    "idb": "^8.0.3"
   }
 }

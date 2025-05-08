@@ -1,26 +1,42 @@
-<!DOCTYPE html>
+<!-- <!DOCTYPE html>
 <html>
     <head>
-        <title>Download History</title>
+        <meta charset="utf-8" />
+        <title>CSV Logger Settings</title>
         <style>
-            html, body {
-                width: 300px;
-                height: 400px;
-                margin: 0;
-                padding: 10px;
-                box-sizing: border-box;
-                font-family: Arial, sans-serif;
-            }
-            h2 { font-size: 16px; }
-            ul { padding-left: 16px; }
-            li { font-size: 14px; word-break: break-all; margin-bottom: 4px; }
+            body { font-family: sans-serif; padding: 10px; width: 300px; }
+            label, input, button { display: block; margin-bottom: 8px; width: 100%; }
+            #fileName { font-size: 0.9em; color: #555; margin-top: -4px; margin-bottom: 12px; }
         </style>
     </head>
-
     <body>
-        <h2>Last 10 Downloads</h2>
-        <ul id="historyList"></ul>
+        <h3>CSV Settings</h3>
+
+        <label for="fileInput">Select your CSV log file:</label>
+        <input type="file" id="fileInput" accept=".csv, .xls, .xlsx" />
+        <div id="fileName">No file chosen</div>
+
+        <button id="saveBtn" disabled>Save</button>
 
         <script src="popup.js"></script>
     </body>
+</html> -->
+
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>PA Log</title>
+    <style>
+      body { font-family: sans-serif; padding: 10px; }
+      button { width: 100%; padding: 8px; }
+    </style>
+  </head>
+  <body>
+    <h3>PA Log</h3>
+    <button id="downloadBtn">Download CSV</button>
+    <script src="popup.js"></script>
+  </body>
 </html>
+
