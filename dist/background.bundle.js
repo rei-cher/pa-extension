@@ -88,15 +88,15 @@ async function C(a, t, s) {
       throw new Error(`HTTP ${i.status}`);
     const r = await i.json();
     console.log("EMA patient return data:", r);
-    const l = Array.isArray(r) ? r : Array.isArray(r.patients) ? r.patients : [], d = t.toLowerCase().split(/\s+|-/).filter((c) => c), h = s.toLowerCase().split(/\s+|-/).filter((c) => c), m = l.filter((c) => {
+    const l = Array.isArray(r) ? r : Array.isArray(r.patients) ? r.patients : [], d = t.toLowerCase().split(/\s+|-/).filter((c) => c), h = s.toLowerCase().split(/\s+|-/).filter((c) => c), f = l.filter((c) => {
       const _ = [
         c.firstName || "",
         c.lastName || "",
         c.fullName || ""
-      ].join(" ").toLowerCase(), f = d.some((p) => _.includes(p)), w = h.some((p) => _.includes(p));
-      return f && w;
+      ].join(" ").toLowerCase(), w = d.some((p) => _.includes(p)), g = h.some((p) => _.includes(p));
+      return w && g;
     });
-    return console.log("Matched patients:", m), m;
+    return console.log("Matched patients:", f), f;
   } catch (o) {
     throw console.error(`Error fetching user in ema: ${o}`), o;
   }
@@ -164,30 +164,30 @@ async function B(a) {
     patient_dob: o,
     drug: e,
     submitted_by: i
-  } = a, r = /* @__PURE__ */ new Date(), l = String(r.getMonth() + 1).padStart(2, "0"), d = String(r.getDate()).padStart(2, "0"), h = r.getFullYear(), m = `${l}/${d}/${h}`, c = [
+  } = a, r = /* @__PURE__ */ new Date(), l = String(r.getMonth() + 1).padStart(2, "0"), d = String(r.getDate()).padStart(2, "0"), h = r.getFullYear(), f = `${l}/${d}/${h}`, c = [
     t,
     s,
     n,
     o,
     e,
     i,
-    m,
+    f,
     "Pending"
   ].join(",") + `
-`, { pa_csv_log: _ = I } = await chrome.storage.local.get(E), f = _ + c;
-  await chrome.storage.local.set({ [E]: f }), await H(f);
-  const w = [
+`, { pa_csv_log: _ = I } = await chrome.storage.local.get(E), w = _ + c;
+  await chrome.storage.local.set({ [E]: w }), await H(w);
+  const g = [
     t,
     s,
     n,
     o,
     e,
     i,
-    m,
+    f,
     "Pending"
   ];
   try {
-    await j(w), console.log("[Sheets] row appended");
+    await j(g), console.log("[Sheets] row appended");
   } catch (p) {
     console.error("[Sheets] append failed:", p);
   }
@@ -203,23 +203,23 @@ async function H(a) {
     console.log("[CSV Logger] download triggered:", o);
   });
 }
-const g = /* @__PURE__ */ new Map(), $ = /* @__PURE__ */ new Set();
+const m = /* @__PURE__ */ new Map(), $ = /* @__PURE__ */ new Set();
 setInterval(() => {
   console.log("===Processed PAs===");
-  for (const [a, t] of g.entries())
+  for (const [a, t] of m.entries())
     console.log(`PA id: ${a}: downloaded - ${t.downloaded}`);
 }, 3e4);
 async function J(a) {
   let t;
   if ((a.url.includes("dashboard.covermymeds.com/api/requests/") || a.url.includes("www.covermymeds.com/request/faxconfirmation/")) && (t = a.url.split("/")[5].split("?")[0]), !t || $.has(t)) return;
-  const s = g.get(t);
+  const s = m.get(t);
   if (s != null && s.downloaded) {
     console.log(`[PA ${t}] Ignored`);
     return;
   }
   $.add(t);
   try {
-    g.has(t) || g.set(t, { downloaded: !1 });
+    m.has(t) || m.set(t, { downloaded: !1 });
     const n = await v(t), {
       patient_fname: o,
       patient_lname: e,
@@ -228,16 +228,16 @@ async function J(a) {
       submitted_by: l,
       epa_status: d,
       workflow_status: h,
-      submitted_by_user_category: m,
+      submitted_by_user_category: f,
       completed: c,
       status_dialog: _,
-      status_dialog_loading: f
+      status_dialog_loading: w
     } = n;
     console.log("Processing PA:", t, o, e, r);
-    const w = d === "PA Request - Sent to Plan" || a.url.includes(`faxconfirmation/${t}`), p = d === "PA Response" || d === "Question Response" && c !== "false" || h === "Sent to Plan" || d === "PA Request - Sent to Plan" && f.length;
-    if (!g.get(t).downloaded && (w || p)) {
+    const g = d === "PA Request - Sent to Plan" || a.url.includes(`faxconfirmation/${t}`), p = d === "PA Response" || d === "Question Response" && c !== "false" || h === "Sent to Plan" || d === "PA Request - Sent to Plan" && w.length;
+    if (!m.get(t).downloaded && (g || p)) {
       const R = await D(t, o, e, r), x = await N(R);
-      if (console.log(`[PA ${t}] Downloaded file path:`, x), g.get(t).downloaded = !0, await B({ pa_id: t, patient_fname: o, patient_lname: e, patient_dob: i, drug: r, submitted_by: l }), w) {
+      if (console.log(`[PA ${t}] Downloaded file path:`, x), m.get(t).downloaded != !0 && await B({ pa_id: t, patient_fname: o, patient_lname: e, patient_dob: i, drug: r, submitted_by: l }), m.get(t).downloaded = !0, g) {
         const y = await C(i, o, e);
         if (console.log("Ema Patient:", y), y != null && y.length) {
           const { id: T } = y[0];

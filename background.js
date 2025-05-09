@@ -78,18 +78,24 @@ async function handlePARequest(details) {
 
         const isTerminalCase =
             epa_status === "PA Response" ||
-            (epa_status === "Question Response" && completed !== "false") ||
             workflow_status === "Sent to Plan" ||
+            workflow_status === "Archived" ||
+            (epa_status === "Question Response" && completed !== "false") ||
             (epa_status === "PA Request - Sent to Plan" && status_dialog_loading.length);
 
-        if (!processedPA.get(pa_id).downloaded && (isUploadCase || isTerminalCase)) {
+        if (!processedPA.get(pa_id).downloaded && (isUploadCase || !isTerminalCase)) {
             const downloadId = await downloadPA(pa_id, patient_fname, patient_lname, drug);
             const filepath = await waitForDownloadFilename(downloadId);
             console.log(`[PA ${pa_id}] Downloaded file path:`, filepath);
 
+            // check if the pa download status is not true
+            // if not, then log to csv, otherwise - skip
+            if (processedPA.get(pa_id).downloaded != true) {
+                await logPaDownload({ pa_id, patient_fname, patient_lname, patient_dob, drug, submitted_by });
+            }
+
             // Mark as downloaded
             processedPA.get(pa_id).downloaded = true;
-            await logPaDownload({ pa_id, patient_fname, patient_lname, patient_dob, drug, submitted_by });
 
             if (isUploadCase) {
                 const matches = await findEmaPatient(patient_dob, patient_fname, patient_lname);
