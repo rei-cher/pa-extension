@@ -7,6 +7,7 @@
         "tabs", 
         "cookies",
         "storage",
+        "identity",
         "downloads",
         "scripting",
         "webRequest",
@@ -16,14 +17,15 @@
     "host_permissions": [
         "*://portal-services.covermymeds.com/*",
         "*://*.covermymeds.com/*",
-        "*://*.ema.md/*"
+        "*://*.ema.md/*",
+        "https://www.googleapis.com/*",
+        "https://sheets.googleapis.com/*"
     ],
-    "declarative_net_request" : {
-        "rule_resources" : [{
-            "id": "cors",
-            "enabled": true,
-            "path": "cors_rules.json"
-        }]
+    "oauth2": {
+        "client_id": "820508291637-buhkene7s9rm9ia28bm05iidctnjh1q9.apps.googleusercontent.com",
+        "scopes": [
+            "https://www.googleapis.com/auth/spreadsheets"
+        ]
     },
     "background": {
         "service_worker": "dist/background.bundle.js",

@@ -2,47 +2,12 @@ import { getPAInfo } from "./func/pt-pa-info.js";
 import { downloadPA, waitForDownloadFilename } from "./func/pa-downloader.js";
 import { findEmaPatient } from "./func/pt-ema.js";
 import { uploadPdf } from "./func/pt-ema-upload.js";
+import { logPaDownload } from "./func/csv-logger.js";
+
 
 // Utilities
 const processedPA = new Map(); // pa_id => { downloaded: boolean }
 const processingPA = new Set();
-
-// Log one entry to chrome.storage.local
-async function logPAInStorage(entry) {
-    // entry: { pa_id, firstName, lastName, dob, drug, timestamp, status, submittedBy }
-    const { paLog = [] } = await chrome.storage.local.get("paLog");
-    paLog.push(entry);
-    await chrome.storage.local.set({ paLog });
-}
-
-// Build CSV blob and auto‑download it
-async function exportCSV() {
-  const { paLog = [] } = await chrome.storage.local.get("paLog");
-  if (!paLog.length) return;
-
-  // assemble CSV text
-  const header = ["PA ID","First Name","Last Name","DOB","Drug","Timestamp","Status","Submitted By"]
-    .join(",") + "\n";
-  const rows = paLog
-    .map(e => [
-      e.pa_id, e.firstName, e.lastName, e.dob,
-      e.drug, e.timestamp, e.status, e.submittedBy
-    ].join(","))
-    .join("\n");
-
-  const blob = new Blob([header + rows], { type: "text/csv" });
-  const url  = URL.createObjectURL(blob);
-
-  // this will silently save to the user’s default Download folder as “pa-log.csv”
-  await chrome.downloads.download({
-    url,
-    filename: "pa-log.csv",
-    saveAs: false
-  });
-
-  // cleanup
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
 
 function skipPA(pa_info) {
     const {
@@ -122,25 +87,9 @@ async function handlePARequest(details) {
             const filepath = await waitForDownloadFilename(downloadId);
             console.log(`[PA ${pa_id}] Downloaded file path:`, filepath);
 
-            const entry = {
-                pa_id,
-                firstName: patient_fname,
-                lastName: patient_lname,
-                dob: patient_dob,
-                drug: drug,
-                timestamp: new Date().toISOString(),
-                status: "Pending",
-                submyted_by: submitted_by
-            };
-
-            // store in chrome.storage.local
-            await logPAInStorage(entry);
-
-            // immediately push out a CSV download
-            exportCSV();
-
             // Mark as downloaded
             processedPA.get(pa_id).downloaded = true;
+            await logPaDownload({ pa_id, patient_fname, patient_lname, patient_dob, drug, submitted_by });
 
             if (isUploadCase) {
                 const matches = await findEmaPatient(patient_dob, patient_fname, patient_lname);
