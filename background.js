@@ -83,7 +83,7 @@ async function handlePARequest(details) {
             (epa_status === "Question Response" && completed !== "false") ||
             (epa_status === "PA Request - Sent to Plan" && status_dialog_loading.length);
 
-        if (!processedPA.get(pa_id).downloaded && (isUploadCase || !isTerminalCase)) {
+        if (!processedPA.get(pa_id).downloaded && (isUploadCase || isTerminalCase)) {
             const downloadId = await downloadPA(pa_id, patient_fname, patient_lname, drug);
             const filepath = await waitForDownloadFilename(downloadId);
             console.log(`[PA ${pa_id}] Downloaded file path:`, filepath);
