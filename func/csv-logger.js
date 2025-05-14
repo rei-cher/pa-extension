@@ -96,9 +96,17 @@ export async function logPaDownload(paInfo) {
     const yyyy = now.getFullYear();
     const dateStamp = `${mm}/${dd}/${yyyy}`;
 
+    function escapeCSVField(value) {
+        const str = String(value ?? ''); // ensure it's a string
+        if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+            return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+    }
+    
     // Build CSV row
     const newRow = [
-        pa_id,
+        `=HYPERLINK("https://dashboard.covermymeds.com/v2/requests/${pa_id}", "${pa_id}")`,
         patient_fname,
         patient_lname,
         patient_dob,
@@ -106,7 +114,7 @@ export async function logPaDownload(paInfo) {
         submitted_by,
         dateStamp,
         'Pending'
-    ].join(',') + '\n';
+    ].map(escapeCSVField).join(',') + '\n';
 
     // Retrieve existing CSV or start with header
     const { pa_csv_log = CSV_HEADER } = await chrome.storage.local.get(STORAGE_KEY);
