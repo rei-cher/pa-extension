@@ -15,7 +15,8 @@ const CSV_HEADER = [
     'Drug',
     'Submitted by',
     'Submitted at',
-    'Status'
+    'Status',
+    'Pt Ema ID'
 ].join(',') + '\n';
 
 
@@ -86,7 +87,8 @@ export async function logPaDownload(paInfo) {
         patient_lname,
         patient_dob,
         drug,
-        submitted_by
+        submitted_by,
+        patientId
     } = paInfo;
 
     // Format current date as MM/DD/YYYY for the CSV timestamp
@@ -113,7 +115,8 @@ export async function logPaDownload(paInfo) {
         drug,
         submitted_by,
         dateStamp,
-        'Pending'
+        'Pending',
+        patientId
     ].map(escapeCSVField).join(',') + '\n';
 
     // Retrieve existing CSV or start with header
@@ -139,12 +142,12 @@ export async function logPaDownload(paInfo) {
         dateStamp,
         'Pending'
     ];
-    try {
-        await appendRowToSheet(sheetRow);
-        console.log('[Sheets] row appended');
-    } catch (e) {
-        console.error('[Sheets] append failed:', e);
-    }
+    // try {
+    //     await appendRowToSheet(sheetRow);
+    //     console.log('[Sheets] row appended');
+    // } catch (e) {
+    //     console.error('[Sheets] append failed:', e);
+    // }
 }
 
 /**

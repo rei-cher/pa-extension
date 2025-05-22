@@ -83,65 +83,65 @@ async function handlePARequest(details) {
             (epa_status === "Question Response" && completed !== "false") ||
             (epa_status === "PA Request - Sent to Plan" && status_dialog_loading.length);
 
-        if (!processedPA.get(pa_id).downloaded && (isUploadCase || isTerminalCase)) {
+        if (!processedPA.get(pa_id).downloaded && isUploadCase && !isTerminalCase) {
             const downloadId = await downloadPA(pa_id, patient_fname, patient_lname, drug);
             const filepath = await waitForDownloadFilename(downloadId);
             console.log(`[PA ${pa_id}] Downloaded file path:`, filepath);
 
-            // check if the pa download status is not true
-            // if not, then log to csv, otherwise - skip
-            if (processedPA.get(pa_id).downloaded != true) {
-                await logPaDownload({ pa_id, patient_fname, patient_lname, patient_dob, drug, submitted_by });
-            }
+            
+            const matches = await findEmaPatient(patient_dob, patient_fname, patient_lname);
+            // if (isUploadCase) {
+            console.log("Ema Patient:", matches);
+            
+            if (matches?.length) {
+                const { id: patientId } = matches[0];
+                console.log(`[PA ${pa_id}] Uploading PDF for patientId=${patientId}`);
+                
+                // check if the pa download status is not true
+                // if not, then log to csv, otherwise - skip
+                if (processedPA.get(pa_id).downloaded != true) {
+                    await logPaDownload({ pa_id, patient_fname, patient_lname, patient_dob, drug, submitted_by, patientId });
+                }
+                
+                // Mark as downloaded
+                processedPA.get(pa_id).downloaded = true;
 
-            // Mark as downloaded
-            processedPA.get(pa_id).downloaded = true;
-
-            if (isUploadCase) {
-                const matches = await findEmaPatient(patient_dob, patient_fname, patient_lname);
-                console.log("Ema Patient:", matches);
-
-                if (matches?.length) {
-                    const { id: patientId } = matches[0];
-                    console.log(`[PA ${pa_id}] Uploading PDF for patientId=${patientId}`);
-
-                    let emaTabId = null;
-                    try {
-                        const tabs = await chrome.tabs.query({});
-                        const emaTab = tabs.find(t => t.url?.includes('ema.md'));
-                        if (emaTab) {
-                            emaTabId = emaTab.id;
-                            console.log(`[PA ${pa_id}] Found EMA tab ID:`, emaTabId);
-                        }
-                    } catch (tabErr) {
-                        console.error(`[PA ${pa_id}] Error finding EMA tab:`, tabErr);
+                let emaTabId = null;
+                try {
+                    const tabs = await chrome.tabs.query({});
+                    const emaTab = tabs.find(t => t.url?.includes('ema.md'));
+                    if (emaTab) {
+                        emaTabId = emaTab.id;
+                        console.log(`[PA ${pa_id}] Found EMA tab ID:`, emaTabId);
                     }
+                } catch (tabErr) {
+                    console.error(`[PA ${pa_id}] Error finding EMA tab:`, tabErr);
+                }
 
-                    if (emaTabId) {
-                        try {
-                            const resp = await fetch(
-                                `https://dashboard.covermymeds.com/api/requests/${pa_id}/download`,
-                                { credentials: 'include' }
-                            );
-                            if (!resp.ok) throw new Error(`PDF fetch failed: ${resp.statusText}`);
+                if (emaTabId) {
+                    // try {
+                        const resp = await fetch(
+                            `https://dashboard.covermymeds.com/api/requests/${pa_id}/download`,
+                            { credentials: 'include' }
+                        );
+                        if (!resp.ok) throw new Error(`PDF fetch failed: ${resp.statusText}`);
 
-                            const pdfBlob = await resp.blob();
-                            const fileName = `${patient_fname}-${patient_lname}-${drug}.pdf`;
-                            const fileObj = new File([pdfBlob], fileName, { type: 'application/pdf' });
+                        const pdfBlob = await resp.blob();
+                        const fileName = `${patient_fname}-${patient_lname}-${drug}.pdf`;
+                        const fileObj = new File([pdfBlob], fileName, { type: 'application/pdf' });
 
-                            const dtoList = [{
-                                patient: { id: patientId, lastName: patient_lname, firstName: patient_fname },
-                                additionalInfo: { performedDate: new Date().toISOString() },
-                                fileName: fileObj.name,
-                                title: `${drug} pa submitted: ${new Date().toLocaleDateString()}`
-                            }];
+                        const dtoList = [{
+                            patient: { id: String(patientId), lastName: patient_lname, firstName: patient_fname },
+                            additionalInfo: { performedDate: new Date().toISOString() },
+                            fileName: fileObj.name,
+                            title: `${drug} pa submitted: ${new Date().toLocaleDateString()}`
+                        }];
 
-                            const uploadResult = await uploadPdf(emaTabId, dtoList, fileObj);
-                            console.log(`[PA ${pa_id}] EMA upload result:`, uploadResult);
-                        } catch (uploadErr) {
-                            console.error(`[PA ${pa_id}] Upload error:`, uploadErr);
-                        }
-                    }
+                        const uploadResult = await uploadPdf(emaTabId, dtoList, fileObj);
+                        console.log(`[PA ${pa_id}] EMA upload result:`, uploadResult);
+                    // } catch (uploadErr) {
+                    //     console.error(`[PA ${pa_id}] Upload error:`, uploadErr);
+                    // }
                 }
             }
         }

@@ -2,12 +2,14 @@ export async function uploadPdf(tabId, dtoList, file) {
     try {
         const formData = new FormData();
 
-        const dtoListBlob = new Blob([JSON.stringify(dtoList)], { type: 'application/json' });
-        formData.append('dtoList', JSON.stringify(dtoListBlob));
-        
-        formData.append('file', file, file.name);
+        formData.append('dtoList', JSON.stringify(dtoList)); // Send raw JSON string
 
-        // formData.append('tabId', tabId);
+        const fileBlob = new Blob([await file.arrayBuffer()], { type: file.type });
+        formData.append('files', fileBlob, file.name);
+
+        for (let pair of formData.entries()) {
+            console.log(pair[0], pair[1]);
+        }
 
         const response = await fetch(
             "https://khasak.ema.md/ema/ws/v3/fileAttachment/upload", 
@@ -18,7 +20,9 @@ export async function uploadPdf(tabId, dtoList, file) {
         );
 
         if (!response.ok) {
-            throw new Error(`Upload failed: ${response.statusText}`);
+            // throw new Error(`Upload failed: ${response.statusText}`);
+            console.error(response)
+            console.error(response.statusText)
         }
 
         const result = await response.json();
@@ -26,7 +30,7 @@ export async function uploadPdf(tabId, dtoList, file) {
     } 
     catch (error) {
         console.error('Upload error:', error);
-        throw error;
+        // throw error;
     }
 }
 

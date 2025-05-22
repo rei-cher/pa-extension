@@ -1,4 +1,4 @@
-function C(a) {
+function F(a) {
   if (a.patient_dob) return a.patient_dob;
   for (const t of a.sections || [])
     for (const s of t.rows || [])
@@ -27,7 +27,7 @@ async function N(a) {
     return console.log("PA data:", e), {
       patient_fname: e.patient_fname,
       patient_lname: e.patient_lname,
-      patient_dob: C(e),
+      patient_dob: F(e),
       drug: e.drug.split(" ")[0],
       submitted_by: e.submitted_by,
       epa_status: e.ePA_Status_description,
@@ -41,7 +41,7 @@ async function N(a) {
     throw console.error("Error fetching PA info:", o), o;
   }
 }
-async function I(a, t, s, n) {
+async function C(a, t, s, n) {
   return new Promise((o, e) => {
     const i = `https://dashboard.covermymeds.com/api/requests/${a}/download`;
     console.log("downloadPA called:", i), chrome.downloads.download({
@@ -54,7 +54,7 @@ async function I(a, t, s, n) {
     });
   });
 }
-function R(a) {
+function L(a) {
   return new Promise((t, s) => {
     const n = (o) => {
       var e, i;
@@ -67,7 +67,7 @@ function R(a) {
     }, 6e4);
   });
 }
-async function O(a, t, s) {
+async function M(a, t, s) {
   console.log(`Trying to find the patient in ema: ${t} ${s} ${a}`);
   const n = "https://khasak.ema.md/ema/ws/v3/patients/search?";
   try {
@@ -88,23 +88,27 @@ async function O(a, t, s) {
       throw new Error(`HTTP ${i.status}`);
     const r = await i.json();
     console.log("EMA patient return data:", r);
-    const l = Array.isArray(r) ? r : Array.isArray(r.patients) ? r.patients : [], d = t.toLowerCase().split(/\s+|-/).filter((c) => c), g = s.toLowerCase().split(/\s+|-/).filter((c) => c), h = l.filter((c) => {
-      const _ = [
-        c.firstName || "",
-        c.lastName || "",
-        c.fullName || ""
-      ].join(" ").toLowerCase(), y = d.some((m) => _.includes(m)), p = g.some((m) => _.includes(m));
-      return y && p;
+    const u = Array.isArray(r) ? r : Array.isArray(r.patients) ? r.patients : [], c = t.toLowerCase().split(/\s+|-/).filter((l) => l), f = s.toLowerCase().split(/\s+|-/).filter((l) => l), g = u.filter((l) => {
+      const h = [
+        l.firstName || "",
+        l.lastName || "",
+        l.fullName || ""
+      ].join(" ").toLowerCase(), _ = c.some((d) => h.includes(d)), y = f.some((d) => h.includes(d));
+      return _ && y;
     });
-    return console.log("Matched patients:", h), h;
+    return console.log("Matched patients:", g), g;
   } catch (o) {
     throw console.error(`Error fetching user in ema: ${o}`), o;
   }
 }
-async function M(a, t, s) {
+async function R(a, t, s) {
   try {
-    const n = new FormData(), o = new Blob([JSON.stringify(t)], { type: "application/json" });
-    n.append("dtoList", JSON.stringify(o)), n.append("file", s, s.name);
+    const n = new FormData();
+    n.append("dtoList", JSON.stringify(t));
+    const o = new Blob([await s.arrayBuffer()], { type: s.type });
+    n.append("files", o, s.name);
+    for (let r of n.entries())
+      console.log(r[0], r[1]);
     const e = await fetch(
       "https://khasak.ema.md/ema/ws/v3/fileAttachment/upload",
       {
@@ -112,14 +116,12 @@ async function M(a, t, s) {
         body: n
       }
     );
-    if (!e.ok)
-      throw new Error(`Upload failed: ${e.statusText}`);
-    return await e.json();
+    return e.ok || (console.error(e), console.error(e.statusText)), await e.json();
   } catch (n) {
-    throw console.error("Upload error:", n), n;
+    console.error("Upload error:", n);
   }
 }
-const T = "pa_csv_log", q = "1NvSE5xwn5TM1iy_PXK-_ckk3F7-LZ3ksdHvNlOaY1es", F = "PA Status", x = [
+const I = "pa_csv_log", T = [
   "pa_id",
   "First Name",
   "Last Name",
@@ -127,48 +129,24 @@ const T = "pa_csv_log", q = "1NvSE5xwn5TM1iy_PXK-_ckk3F7-LZ3ksdHvNlOaY1es", F = 
   "Drug",
   "Submitted by",
   "Submitted at",
-  "Status"
+  "Status",
+  "Pt Ema ID"
 ].join(",") + `
 `;
-function U() {
-  return new Promise((a, t) => {
-    chrome.identity.getAuthToken({ interactive: !0 }, (s) => {
-      if (chrome.runtime.lastError || !s)
-        return t(chrome.runtime.lastError);
-      a(s);
-    });
-  });
-}
-async function j(a) {
-  const t = await U(), s = `'${F}'!A1`, n = encodeURIComponent(s), o = `https://sheets.googleapis.com/v4/spreadsheets/${q}/values:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS&range=${n}`, e = { values: [a] }, i = await fetch(o, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${t}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(e)
-  }), r = await i.text(), l = i.headers.get("content-type") || "";
-  if (!i.ok)
-    throw console.error("[Sheets] bad response:", i.status, i.statusText, `
-`, r), new Error(`Sheets API returned HTTP ${i.status}`);
-  if (l.includes("application/json"))
-    return JSON.parse(r);
-  throw console.error("[Sheets] unexpected content-type:", l, `
-`, r), new Error("Sheets API returned non‑JSON response (see console for HTML)");
-}
-async function H(a) {
+async function k(a) {
   const {
     pa_id: t,
     patient_fname: s,
     patient_lname: n,
     patient_dob: o,
     drug: e,
-    submitted_by: i
-  } = a, r = /* @__PURE__ */ new Date(), l = String(r.getMonth() + 1).padStart(2, "0"), d = String(r.getDate()).padStart(2, "0"), g = r.getFullYear(), h = `${l}/${d}/${g}`;
-  function c(P) {
-    const f = String(P ?? "");
-    return f.includes(",") || f.includes('"') || f.includes(`
-`) ? `"${f.replace(/"/g, '""')}"` : f;
+    submitted_by: i,
+    patientId: r
+  } = a, u = /* @__PURE__ */ new Date(), c = String(u.getMonth() + 1).padStart(2, "0"), f = String(u.getDate()).padStart(2, "0"), g = u.getFullYear(), l = `${c}/${f}/${g}`;
+  function h(E) {
+    const m = String(E ?? "");
+    return m.includes(",") || m.includes('"') || m.includes(`
+`) ? `"${m.replace(/"/g, '""')}"` : m;
   }
   const _ = [
     `=HYPERLINK("https://dashboard.covermymeds.com/v2/requests/${t}", "${t}")`,
@@ -177,29 +155,15 @@ async function H(a) {
     o,
     e,
     i,
-    h,
-    "Pending"
-  ].map(c).join(",") + `
-`, { pa_csv_log: y = x } = await chrome.storage.local.get(T), p = y + _;
-  await chrome.storage.local.set({ [T]: p }), await B(p);
-  const m = [
-    t,
-    s,
-    n,
-    o,
-    e,
-    i,
-    h,
-    "Pending"
-  ];
-  try {
-    await j(m), console.log("[Sheets] row appended");
-  } catch (P) {
-    console.error("[Sheets] append failed:", P);
-  }
+    l,
+    "Pending",
+    r
+  ].map(h).join(",") + `
+`, { pa_csv_log: y = T } = await chrome.storage.local.get(I), d = y + _;
+  await chrome.storage.local.set({ [I]: d }), await O(d);
 }
-async function B(a) {
-  const { pa_csv_log: t = x } = await chrome.storage.local.get(T), n = "data:text/csv;charset=utf-8," + encodeURIComponent(a || t);
+async function O(a) {
+  const { pa_csv_log: t = T } = await chrome.storage.local.get(I), n = "data:text/csv;charset=utf-8," + encodeURIComponent(a || t);
   chrome.downloads.download({
     url: n,
     filename: "pa_log.csv",
@@ -209,72 +173,68 @@ async function B(a) {
     console.log("[CSV Logger] download triggered:", o);
   });
 }
-const w = /* @__PURE__ */ new Map(), v = /* @__PURE__ */ new Set();
+const p = /* @__PURE__ */ new Map(), D = /* @__PURE__ */ new Set();
 setInterval(() => {
   console.log("===Processed PAs===");
-  for (const [a, t] of w.entries())
+  for (const [a, t] of p.entries())
     console.log(`PA id: ${a}: downloaded - ${t.downloaded}`);
 }, 3e4);
-async function J(a) {
+async function B(a) {
   let t;
-  if ((a.url.includes("dashboard.covermymeds.com/api/requests/") || a.url.includes("www.covermymeds.com/request/faxconfirmation/")) && (t = a.url.split("/")[5].split("?")[0]), !t || v.has(t)) return;
-  const s = w.get(t);
+  if ((a.url.includes("dashboard.covermymeds.com/api/requests/") || a.url.includes("www.covermymeds.com/request/faxconfirmation/")) && (t = a.url.split("/")[5].split("?")[0]), !t || D.has(t)) return;
+  const s = p.get(t);
   if (s != null && s.downloaded) {
     console.log(`[PA ${t}] Ignored`);
     return;
   }
-  v.add(t);
+  D.add(t);
   try {
-    w.has(t) || w.set(t, { downloaded: !1 });
+    p.has(t) || p.set(t, { downloaded: !1 });
     const n = await N(t), {
       patient_fname: o,
       patient_lname: e,
       patient_dob: i,
       drug: r,
-      submitted_by: l,
-      epa_status: d,
-      workflow_status: g,
-      submitted_by_user_category: h,
-      completed: c,
-      status_dialog: _,
-      status_dialog_loading: y
+      submitted_by: u,
+      epa_status: c,
+      workflow_status: f,
+      submitted_by_user_category: g,
+      completed: l,
+      status_dialog: h,
+      status_dialog_loading: _
     } = n;
     console.log("Processing PA:", t, o, e, r);
-    const p = d === "PA Request - Sent to Plan" || a.url.includes(`faxconfirmation/${t}`), m = d === "PA Response" || g === "Sent to Plan" || g === "Archived" || d === "Question Response" && c !== "false" || d === "PA Request - Sent to Plan" && y.length;
-    if (!w.get(t).downloaded && (p || m)) {
-      const P = await I(t, o, e, r), f = await R(P);
-      if (console.log(`[PA ${t}] Downloaded file path:`, f), w.get(t).downloaded != !0 && await H({ pa_id: t, patient_fname: o, patient_lname: e, patient_dob: i, drug: r, submitted_by: l }), w.get(t).downloaded = !0, p) {
-        const b = await O(i, o, e);
-        if (console.log("Ema Patient:", b), b != null && b.length) {
-          const { id: D } = b[0];
-          console.log(`[PA ${t}] Uploading PDF for patientId=${D}`);
-          let S = null;
-          try {
-            const $ = (await chrome.tabs.query({})).find((E) => {
-              var A;
-              return (A = E.url) == null ? void 0 : A.includes("ema.md");
-            });
-            $ && (S = $.id, console.log(`[PA ${t}] Found EMA tab ID:`, S));
-          } catch (u) {
-            console.error(`[PA ${t}] Error finding EMA tab:`, u);
-          }
-          if (S)
-            try {
-              const u = await fetch(
-                `https://dashboard.covermymeds.com/api/requests/${t}/download`,
-                { credentials: "include" }
-              );
-              if (!u.ok) throw new Error(`PDF fetch failed: ${u.statusText}`);
-              const $ = await u.blob(), E = `${o}-${e}-${r}.pdf`, A = new File([$], E, { type: "application/pdf" }), L = [{
-                patient: { id: D, lastName: e, firstName: o },
-                additionalInfo: { performedDate: (/* @__PURE__ */ new Date()).toISOString() },
-                fileName: A.name,
-                title: `${r} pa submitted: ${(/* @__PURE__ */ new Date()).toLocaleDateString()}`
-              }], k = await M(S, L, A);
-              console.log(`[PA ${t}] EMA upload result:`, k);
-            } catch (u) {
-              console.error(`[PA ${t}] Upload error:`, u);
-            }
+    const y = c === "PA Request - Sent to Plan" || a.url.includes(`faxconfirmation/${t}`), d = c === "PA Response" || f === "Sent to Plan" || f === "Archived" || c === "Question Response" && l !== "false" || c === "PA Request - Sent to Plan" && _.length;
+    if (!p.get(t).downloaded && (y || d)) {
+      const E = await C(t, o, e, r), m = await L(E);
+      console.log(`[PA ${t}] Downloaded file path:`, m);
+      const b = await M(i, o, e);
+      if (console.log("Ema Patient:", b), b != null && b.length) {
+        const { id: S } = b[0];
+        console.log(`[PA ${t}] Uploading PDF for patientId=${S}`), p.get(t).downloaded != !0 && await k({ pa_id: t, patient_fname: o, patient_lname: e, patient_dob: i, drug: r, submitted_by: u, patientId: S }), p.get(t).downloaded = !0;
+        let A = null;
+        try {
+          const $ = (await chrome.tabs.query({})).find((v) => {
+            var P;
+            return (P = v.url) == null ? void 0 : P.includes("ema.md");
+          });
+          $ && (A = $.id, console.log(`[PA ${t}] Found EMA tab ID:`, A));
+        } catch (w) {
+          console.error(`[PA ${t}] Error finding EMA tab:`, w);
+        }
+        if (A) {
+          const w = await fetch(
+            `https://dashboard.covermymeds.com/api/requests/${t}/download`,
+            { credentials: "include" }
+          );
+          if (!w.ok) throw new Error(`PDF fetch failed: ${w.statusText}`);
+          const $ = await w.blob(), v = `${o}-${e}-${r}.pdf`, P = new File([$], v, { type: "application/pdf" }), q = [{
+            patient: { id: String(S), lastName: e, firstName: o },
+            additionalInfo: { performedDate: (/* @__PURE__ */ new Date()).toISOString() },
+            fileName: P.name,
+            title: `${r} pa submitted: ${(/* @__PURE__ */ new Date()).toLocaleDateString()}`
+          }], x = await R(A, q, P);
+          console.log(`[PA ${t}] EMA upload result:`, x);
         }
       }
     } else
@@ -282,21 +242,21 @@ async function J(a) {
   } catch (n) {
     console.error(`[PA ${t}] Error:`, n);
   } finally {
-    v.delete(t);
+    D.delete(t);
   }
 }
 chrome.webRequest.onCompleted.addListener(
-  J,
+  B,
   { urls: ["*://*.covermymeds.com/*"] }
 );
-async function G(a) {
+async function U(a) {
   try {
-    const t = await N(a), { patient_fname: s, patient_lname: n, drug: o } = t, e = await I(a, s, n, o), i = await R(e);
+    const t = await N(a), { patient_fname: s, patient_lname: n, drug: o } = t, e = await C(a, s, n, o), i = await L(e);
     console.log("[Manual] PDF path:", i);
   } catch (t) {
     console.error(`[Manual] Error in pdfManipulation for PA ID ${a}:`, t);
   }
 }
 export {
-  G as pdfManipulation
+  U as pdfManipulation
 };
