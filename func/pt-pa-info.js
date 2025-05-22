@@ -48,7 +48,8 @@ export async function getPAInfo(pa_id) {
         submitted_by_user_category: data.submitted_by_user_category,
         completed: data.completed,
         status_dialog: data.status_dialog_loading?.text ? data.status_dialog_loading.text : null,
-        status_dialog_loading: data.status_dialog_loading?.text ? data.status_dialog_loading.text : null
+        status_dialog_loading: data.status_dialog_loading?.text ? data.status_dialog_loading.text : null,
+        sent: data?.sent ? data.sent : null
       };
       
     } 

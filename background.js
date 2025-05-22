@@ -9,6 +9,16 @@ import { logPaDownload } from "./func/csv-logger.js";
 const processedPA = new Map(); // pa_id => { downloaded: boolean }
 const processingPA = new Set();
 
+function getTodayDay(){
+    const today = new Date()
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0'); // Months are 0-indexed
+    const day = String(today.getDate()).padStart(2, '0');
+    const formattedDate = `${year}-${month}-${day}`;
+
+    return formattedDate;
+}
+
 function skipPA(pa_info) {
     const {
         epa_status, 
@@ -67,7 +77,8 @@ async function handlePARequest(details) {
             submitted_by_user_category,
             completed,
             status_dialog,
-            status_dialog_loading
+            status_dialog_loading,
+            sent
         } = pa_info;
 
         console.log("Processing PA:", pa_id, patient_fname, patient_lname, drug);
@@ -79,7 +90,7 @@ async function handlePARequest(details) {
         const isTerminalCase =
             epa_status === "PA Response" ||
             workflow_status === "Sent to Plan" ||
-            workflow_status === "Archived" ||
+            (workflow_status === "Archived" && !sent.includes(getTodayDay())) ||
             (epa_status === "Question Response" && completed !== "false") ||
             (epa_status === "PA Request - Sent to Plan" && status_dialog_loading.length);
 
