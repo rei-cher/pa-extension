@@ -92,13 +92,13 @@ async function handlePARequest(details) {
             (workflow_status === "Sent to Plan" && !sent.includes(getTodayDay())) ||
             workflow_status === "Archived" ||
             (epa_status_description === "Question Response" && completed !== "false") ||
-            (epa_status_description === "PA Request - Sent to Plan" && status_dialog_loading.length > 0);
+            (epa_status_description === "PA Request - Sent to Plan" && status_dialog_loading.includes("information has been submitted"));
 
         
-        console.warn(`Status for ${pa_id}\nisUploadCase - ${isUploadCase}\nisTerminalCase - ${isTerminalCase}`)
+        console.warn(`Status for ${pa_id}\nisUploadCase - ${isUploadCase}\nisTerminalCase - ${isTerminalCase}\nDetails url - ${details.url}`)
         
         
-        if (!processedPA.get(pa_id).downloaded && isUploadCase && !isTerminalCase) {
+        if (!processedPA.get(pa_id).downloaded && isUploadCase){ // && !isTerminalCase) {
             console.warn("Inside the if statement with conditional check");
             const downloadId = await downloadPA(pa_id, patient_fname, patient_lname, drug);
             const filepath = await waitForDownloadFilename(downloadId);
@@ -165,6 +165,7 @@ async function handlePARequest(details) {
         }
     } catch (error) {
         console.error(`[PA ${pa_id}] Error:`, error);
+        return;
     } finally {
         processingPA.delete(pa_id);
     }

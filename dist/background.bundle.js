@@ -145,8 +145,8 @@ async function O(a) {
     submitted_by: i,
     patientId: r
   } = a, u = /* @__PURE__ */ new Date(), d = String(u.getMonth() + 1).padStart(2, "0"), f = String(u.getDate()).padStart(2, "0"), g = u.getFullYear(), l = `${d}/${f}/${g}`;
-  function h($) {
-    const m = String($ ?? "");
+  function h(S) {
+    const m = String(S ?? "");
     return m.includes(",") || m.includes('"') || m.includes(`
 `) ? `"${m.replace(/"/g, '""')}"` : m;
   }
@@ -212,10 +212,11 @@ async function j(a) {
       sent: y
     } = o;
     console.log("Processing PA:", t, n, e, r);
-    const c = d === "PA Request - Sent to Plan" || a.url.includes(`faxconfirmation/${t}`), $ = d === "PA Response" || f === "Sent to Plan" && !y.includes(U()) || f === "Archived" || d === "Question Response" && l !== "false" || d === "PA Request - Sent to Plan" && _.length > 0;
+    const c = d === "PA Request - Sent to Plan" || a.url.includes(`faxconfirmation/${t}`), S = d === "PA Response" || f === "Sent to Plan" && !y.includes(U()) || f === "Archived" || d === "Question Response" && l !== "false" || d === "PA Request - Sent to Plan" && _.includes("information has been submitted");
     if (console.warn(`Status for ${t}
 isUploadCase - ${c}
-isTerminalCase - ${$}`), !p.get(t).downloaded && c && !$) {
+isTerminalCase - ${S}
+Details url - ${a.url}`), !p.get(t).downloaded && c) {
       console.warn("Inside the if statement with conditional check");
       const m = await T(t, n, e, r), L = await N(m);
       console.log(`[PA ${t}] Downloaded file path:`, L);
@@ -223,28 +224,28 @@ isTerminalCase - ${$}`), !p.get(t).downloaded && c && !$) {
       if (console.log("Ema Patient:", b), b != null && b.length) {
         const { id: D } = b[0];
         console.log(`[PA ${t}] Uploading PDF for patientId=${D}`), p.get(t).downloaded != !0 && await O({ pa_id: t, patient_fname: n, patient_lname: e, patient_dob: i, drug: r, submitted_by: u, patientId: D }), p.get(t).downloaded = !0;
-        let A = null;
+        let $ = null;
         try {
-          const S = (await chrome.tabs.query({})).find((E) => {
+          const A = (await chrome.tabs.query({})).find((E) => {
             var P;
             return (P = E.url) == null ? void 0 : P.includes("ema.md");
           });
-          S && (A = S.id, console.log(`[PA ${t}] Found EMA tab ID:`, A));
+          A && ($ = A.id, console.log(`[PA ${t}] Found EMA tab ID:`, $));
         } catch (w) {
           console.error(`[PA ${t}] Error finding EMA tab:`, w);
         }
-        if (A) {
+        if ($) {
           const w = await fetch(
             `https://dashboard.covermymeds.com/api/requests/${t}/download`,
             { credentials: "include" }
           );
           if (!w.ok) throw new Error(`PDF fetch failed: ${w.statusText}`);
-          const S = await w.blob(), E = `${n}-${e}-${r}.pdf`, P = new File([S], E, { type: "application/pdf" }), q = [{
+          const A = await w.blob(), E = `${n}-${e}-${r}.pdf`, P = new File([A], E, { type: "application/pdf" }), q = [{
             patient: { id: String(D), lastName: e, firstName: n },
             additionalInfo: { performedDate: (/* @__PURE__ */ new Date()).toISOString() },
             fileName: P.name,
             title: `${r} pa submitted: ${(/* @__PURE__ */ new Date()).toLocaleDateString()}`
-          }], x = await R(A, q, P);
+          }], x = await R($, q, P);
           console.log(`[PA ${t}] EMA upload result:`, x);
         }
       }
@@ -252,6 +253,7 @@ isTerminalCase - ${$}`), !p.get(t).downloaded && c && !$) {
       return;
   } catch (o) {
     console.error(`[PA ${t}] Error:`, o);
+    return;
   } finally {
     v.delete(t);
   }
