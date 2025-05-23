@@ -89,8 +89,8 @@ async function handlePARequest(details) {
 
         const isTerminalCase =
             epa_status === "PA Response" ||
-            workflow_status === "Sent to Plan" ||
-            (workflow_status === "Archived" && !sent.includes(getTodayDay())) ||
+            (workflow_status === "Sent to Plan" && !sent.includes(getTodayDay())) ||
+            workflow_status === "Archived" ||
             (epa_status === "Question Response" && completed !== "false") ||
             (epa_status === "PA Request - Sent to Plan" && status_dialog_loading.length);
 
