@@ -16,6 +16,7 @@ const CSV_HEADER = [
     'Submitted by',
     'Submitted at',
     'Status',
+    'Insurance',
     'Pt Ema ID'
 ].join(',') + '\n';
 
@@ -116,6 +117,7 @@ export async function logPaDownload(paInfo) {
         submitted_by,
         dateStamp,
         'Pending',
+        '',
         patientId
     ].map(escapeCSVField).join(',') + '\n';
 
