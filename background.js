@@ -21,7 +21,7 @@ function getTodayDay(){
 
 function skipPA(pa_info) {
     const {
-        epa_status, 
+        epa_status_description, 
         workflow_status,
         status_dialog,
         status_dialog_loading
@@ -36,7 +36,7 @@ setInterval(() => {
     for (const [pa_id, state] of processedPA.entries()){
         console.log(`PA id: ${pa_id}: downloaded - ${state.downloaded}`);
     }
-}, 30000)
+}, 5000)
 
 async function handlePARequest(details) {
     // Extract PA ID from URL
@@ -72,7 +72,7 @@ async function handlePARequest(details) {
             patient_dob,
             drug,
             submitted_by,
-            epa_status,
+            epa_status_description,
             workflow_status,
             submitted_by_user_category,
             completed,
@@ -84,21 +84,25 @@ async function handlePARequest(details) {
         console.log("Processing PA:", pa_id, patient_fname, patient_lname, drug);
 
         const isUploadCase =
-            epa_status === "PA Request - Sent to Plan" ||
+            epa_status_description === "PA Request - Sent to Plan" ||
             details.url.includes(`faxconfirmation/${pa_id}`);
 
         const isTerminalCase =
-            epa_status === "PA Response" ||
+            epa_status_description === "PA Response" ||
             (workflow_status === "Sent to Plan" && !sent.includes(getTodayDay())) ||
             workflow_status === "Archived" ||
-            (epa_status === "Question Response" && completed !== "false") ||
-            (epa_status === "PA Request - Sent to Plan" && status_dialog_loading.length);
+            (epa_status_description === "Question Response" && completed !== "false") ||
+            (epa_status_description === "PA Request - Sent to Plan" && status_dialog_loading.length > 0);
 
+        
+        console.warn(`Status for ${pa_id}\nisUploadCase - ${isUploadCase}\nisTerminalCase - ${isTerminalCase}`)
+        
+        
         if (!processedPA.get(pa_id).downloaded && isUploadCase && !isTerminalCase) {
+            console.warn("Inside the if statement with conditional check");
             const downloadId = await downloadPA(pa_id, patient_fname, patient_lname, drug);
             const filepath = await waitForDownloadFilename(downloadId);
             console.log(`[PA ${pa_id}] Downloaded file path:`, filepath);
-
             
             const matches = await findEmaPatient(patient_dob, patient_fname, patient_lname);
             // if (isUploadCase) {

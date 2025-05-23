@@ -1,4 +1,5 @@
 export async function downloadPA(pa_id, pt_fname, pt_lname, med) {
+    console.warn("[pa-downloader] Download function is called");
     return new Promise((resolve, reject) => {
         const pdfUrl = `https://dashboard.covermymeds.com/api/requests/${pa_id}/download`;
         console.log("downloadPA called:", pdfUrl);
@@ -22,6 +23,7 @@ export async function downloadPA(pa_id, pt_fname, pt_lname, med) {
 }
 
 export function waitForDownloadFilename(downloadId) {
+    console.warn("[pa-downloader] waitForDownloadFilename function called");
     return new Promise((resolve, reject) => {
         const listener = delta => {
         // only care about our download completing
