@@ -38,7 +38,7 @@ setInterval(() => {
     for (const [pa_id, state] of processedPA.entries()){
         console.log(`PA id: ${pa_id}: downloaded - ${state.downloaded}`);
     }
-}, 5000)
+}, 30000)
 
 async function handlePARequest(details) {
     // Extract PA ID from URL
@@ -74,12 +74,13 @@ async function handlePARequest(details) {
             patient_dob,
             drug,
             submitted_by,
-            epa_status_description,
+            epa_status,
             workflow_status,
             submitted_by_user_category,
             completed,
             insurance,
-            // status_dialog,
+            status_dialog,
+            status_dialog_loading,
             sent,
             npi
         } = pa_info;
@@ -88,26 +89,22 @@ async function handlePARequest(details) {
         console.log("Processing PA:", pa_id, patient_fname, patient_lname, drug);
 
         const isUploadCase =
-            epa_status_description === "PA Request - Sent to Plan" ||
+            epa_status === "PA Request - Sent to Plan" ||
             details.url.includes(`faxconfirmation/${pa_id}`);
 
         const isTerminalCase =
-            epa_status_description === "PA Response" ||
-            // (workflow_status === "Sent to Plan" && !sent.includes(getTodayDay())) ||
+            epa_status === "PA Response" ||
+            workflow_status === "Sent to Plan" ||
             workflow_status === "Archived" ||
-            (epa_status_description === "Question Response" && completed !== "false")
-            // (epa_status_description === "PA Request - Sent to Plan" && status_dialog_loading.includes("information has been submitted"));
+            (epa_status === "Question Response" && completed !== "false") ||
+            (epa_status === "PA Request - Sent to Plan" && status_dialog_loading.length);
 
-        
-        console.warn(`Status for ${pa_id}\nisUploadCase - ${isUploadCase}\nisTerminalCase - ${isTerminalCase}\nDetails url - ${details.url}`)
-        
-        
         if (!processedPA.get(pa_id).downloaded && isUploadCase){ // && !isTerminalCase) {
             console.warn("Inside the if statement with conditional check");
             const downloadId = await downloadPA(pa_id, patient_fname, patient_lname, drug);
             const filepath = await waitForDownloadFilename(downloadId);
             console.log(`[PA ${pa_id}] Downloaded file path:`, filepath);
-            
+
             const matches = await findEmaPatient(patient_dob, patient_fname, patient_lname);
             // if (isUploadCase) {
             console.log("Ema Patient:", matches);
@@ -179,7 +176,6 @@ async function handlePARequest(details) {
         }
     } catch (error) {
         console.error(`[PA ${pa_id}] Error:`, error);
-        return;
     } finally {
         processingPA.delete(pa_id);
     }
@@ -190,17 +186,3 @@ chrome.webRequest.onCompleted.addListener(
     handlePARequest,
     { urls: ["*://*.covermymeds.com/*"] }
 );
-
-// Optional: manually trigger for testing
-export async function pdfManipulation(pa_id) {
-    try {
-        const pa_info = await getPAInfo(pa_id);
-        const { patient_fname, patient_lname, drug } = pa_info;
-
-        const downloadId = await downloadPA(pa_id, patient_fname, patient_lname, drug);
-        const filepath = await waitForDownloadFilename(downloadId);
-        console.log(`[Manual] PDF path:`, filepath);
-    } catch (error) {
-        console.error(`[Manual] Error in pdfManipulation for PA ID ${pa_id}:`, error);
-    }
-}
