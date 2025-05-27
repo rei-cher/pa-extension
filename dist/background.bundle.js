@@ -1,18 +1,33 @@
-function M(a) {
-  if (a.patient_dob) return a.patient_dob;
-  for (const t of a.sections || [])
-    for (const s of t.rows || [])
-      for (const o of s.questions || []) {
-        const n = o.question_text || o.label || o.name || "";
-        if (/date of birth/i.test(n) || /patient_date_of_birth/i.test(n))
-          return o.answer_text ?? o.answer ?? null;
+function x(o) {
+  if (o.patient_dob) return o.patient_dob;
+  for (const t of o.sections || [])
+    for (const n of t.rows || [])
+      for (const e of n.questions || []) {
+        const a = e.question_text || e.label || e.name || "";
+        if (/date of birth/i.test(a) || /patient_date_of_birth/i.test(a))
+          return e.answer_text ?? e.answer ?? null;
       }
   return null;
 }
-async function C(a) {
-  var s, o;
-  console.log(`Getting patient info with ID - ${a}`);
-  const t = `https://dashboard.covermymeds.com/api/requests/${a}?`;
+function I(o) {
+  if (Array.isArray(o))
+    for (const t of o) {
+      const n = I(t);
+      if (n) return n;
+    }
+  else if (typeof o == "object" && o !== null) {
+    if (o.name === "provider_npi" && "answer_text" in o)
+      return o.answer_text;
+    for (const t in o) {
+      const n = I(o[t]);
+      if (n) return n;
+    }
+  }
+  return null;
+}
+async function T(o) {
+  console.log(`Getting patient info with ID - ${o}`);
+  const t = `https://dashboard.covermymeds.com/api/requests/${o}?`;
   try {
     const n = await fetch(t, {
       method: "GET",
@@ -27,58 +42,60 @@ async function C(a) {
     return console.log("PA data:", e), {
       patient_fname: e.patient_fname,
       patient_lname: e.patient_lname,
-      patient_dob: M(e),
+      patient_dob: x(e),
       drug: e.drug.split(" ")[0],
       submitted_by: e.submitted_by,
       epa_status_description: e.ePA_Status_description,
       workflow_status: e.workflow_status,
       submitted_by_user_category: e.submitted_by_user_category,
       completed: e.completed,
-      status_dialog: (s = e.status_dialog_loading) != null && s.text ? e.status_dialog_loading.text : null,
-      status_dialog_loading: (o = e.status_dialog_loading) != null && o.text ? e.status_dialog_loading.text : null,
-      sent: e != null && e.sent ? e.sent : null
+      insurance: e.form_description.split(" ")[0],
+      // status_dialog: data.status_dialog_loading?.text ? data.status_dialog_loading.text : null,
+      // status_dialog_loading: data.status_dialog_loading?.text ? data.status_dialog_loading.text : null,
+      sent: e != null && e.sent ? e.sent : null,
+      npi: I(e)
     };
   } catch (n) {
     throw console.error("Error fetching PA info:", n), n;
   }
 }
-async function T(a, t, s, o) {
-  return console.warn("[pa-downloader] Download function is called"), new Promise((n, e) => {
-    const i = `https://dashboard.covermymeds.com/api/requests/${a}/download`;
+async function F(o, t, n, e) {
+  return console.warn("[pa-downloader] Download function is called"), new Promise((a, s) => {
+    const i = `https://dashboard.covermymeds.com/api/requests/${o}/download`;
     console.log("downloadPA called:", i), chrome.downloads.download({
       url: i,
-      filename: `${t}-${s}-${o}.pdf`
+      filename: `${t}-${n}-${e}.pdf`
     }, (r) => {
       if (chrome.runtime.lastError)
-        return e(chrome.runtime.lastError);
-      console.log("Download started, id=", r), r ? n(r) : e(new Error("Failed to start download"));
+        return s(chrome.runtime.lastError);
+      console.log("Download started, id=", r), r ? a(r) : s(new Error("Failed to start download"));
     });
   });
 }
-function N(a) {
-  return console.warn("[pa-downloader] waitForDownloadFilename function called"), new Promise((t, s) => {
-    const o = (n) => {
-      var e, i;
-      n.id === a && ((e = n.state) == null ? void 0 : e.current) === "complete" && (chrome.downloads.onChanged.removeListener(o), chrome.downloads.search({ id: a }, (r) => {
-        r && r.length ? (console.log("Found download result:", r[0]), t(r[0].filename)) : s(new Error("No results found for downloadId"));
-      })), n.id === a && ((i = n.state) == null ? void 0 : i.current) === "interrupted" && (chrome.downloads.onChanged.removeListener(o), s(new Error("Download was interrupted")));
+function L(o) {
+  return console.warn("[pa-downloader] waitForDownloadFilename function called"), new Promise((t, n) => {
+    const e = (a) => {
+      var s, i;
+      a.id === o && ((s = a.state) == null ? void 0 : s.current) === "complete" && (chrome.downloads.onChanged.removeListener(e), chrome.downloads.search({ id: o }, (r) => {
+        r && r.length ? (console.log("Found download result:", r[0]), t(r[0].filename)) : n(new Error("No results found for downloadId"));
+      })), a.id === o && ((i = a.state) == null ? void 0 : i.current) === "interrupted" && (chrome.downloads.onChanged.removeListener(e), n(new Error("Download was interrupted")));
     };
-    chrome.downloads.onChanged.addListener(o), setTimeout(() => {
-      chrome.downloads.onChanged.removeListener(o), s(new Error("Timed out waiting for download to complete"));
+    chrome.downloads.onChanged.addListener(e), setTimeout(() => {
+      chrome.downloads.onChanged.removeListener(e), n(new Error("Timed out waiting for download to complete"));
     }, 6e4);
   });
 }
-async function k(a, t, s) {
-  console.log(`Trying to find the patient in ema: ${t} ${s} ${a}`);
-  const o = "https://khasak.ema.md/ema/ws/v3/patients/search?";
+async function R(o, t, n) {
+  console.log(`Trying to find the patient in ema: ${t} ${n} ${o}`);
+  const e = "https://khasak.ema.md/ema/ws/v3/patients/search?";
   try {
-    const n = {
-      term: a,
+    const a = {
+      term: o,
       selector: "lastName,firstName,fullName,mrn,pmsId,dateOfBirth,encryptedId",
       "sorting.sortBy": "lastName,firstName",
       "sorting.sortOrder": "asc",
       "paging.pageSize": 25
-    }, e = new URLSearchParams(n).toString(), i = await fetch(`${o}${e}`, {
+    }, s = new URLSearchParams(a).toString(), i = await fetch(`${e}${s}`, {
       method: "GET",
       credentials: "include",
       headers: {
@@ -89,40 +106,40 @@ async function k(a, t, s) {
       throw new Error(`HTTP ${i.status}`);
     const r = await i.json();
     console.log("EMA patient return data:", r);
-    const u = Array.isArray(r) ? r : Array.isArray(r.patients) ? r.patients : [], d = t.toLowerCase().split(/\s+|-/).filter((l) => l), f = s.toLowerCase().split(/\s+|-/).filter((l) => l), g = u.filter((l) => {
-      const h = [
-        l.firstName || "",
-        l.lastName || "",
-        l.fullName || ""
-      ].join(" ").toLowerCase(), _ = d.some((c) => h.includes(c)), y = f.some((c) => h.includes(c));
-      return _ && y;
+    const g = Array.isArray(r) ? r : Array.isArray(r.patients) ? r.patients : [], u = t.toLowerCase().split(/\s+|-/).filter((c) => c), p = n.toLowerCase().split(/\s+|-/).filter((c) => c), h = g.filter((c) => {
+      const m = [
+        c.firstName || "",
+        c.lastName || "",
+        c.fullName || ""
+      ].join(" ").toLowerCase(), P = u.some((d) => m.includes(d)), y = p.some((d) => m.includes(d));
+      return P && y;
     });
-    return console.log("Matched patients:", g), g;
-  } catch (n) {
-    throw console.error(`Error fetching user in ema: ${n}`), n;
+    return console.log("Matched patients:", h), h;
+  } catch (a) {
+    throw console.error(`Error fetching user in ema: ${a}`), a;
   }
 }
-async function R(a, t, s) {
+async function O(o, t, n) {
   try {
-    const o = new FormData();
-    o.append("dtoList", JSON.stringify(t));
-    const n = new Blob([await s.arrayBuffer()], { type: s.type });
-    o.append("files", n, s.name);
-    for (let r of o.entries())
+    const e = new FormData();
+    e.append("dtoList", JSON.stringify(t));
+    const a = new Blob([await n.arrayBuffer()], { type: n.type });
+    e.append("files", a, n.name);
+    for (let r of e.entries())
       console.log(r[0], r[1]);
-    const e = await fetch(
+    const s = await fetch(
       "https://khasak.ema.md/ema/ws/v3/fileAttachment/upload",
       {
         method: "POST",
-        body: o
+        body: e
       }
     );
-    return e.ok || (console.error(e), console.error(e.statusText)), await e.json();
-  } catch (o) {
-    console.error("Upload error:", o);
+    return s.ok || (console.error(s), console.error(s.statusText)), await s.json();
+  } catch (e) {
+    console.error("Upload error:", e);
   }
 }
-const I = "pa_csv_log", F = [
+const N = "pa_csv_log", k = [
   "pa_id",
   "First Name",
   "Last Name",
@@ -132,105 +149,120 @@ const I = "pa_csv_log", F = [
   "Submitted at",
   "Status",
   "Insurance",
-  "Pt Ema ID"
+  "Pt Ema ID",
+  "Additional Info",
+  "NPI"
 ].join(",") + `
 `;
-async function O(a) {
+async function B(o) {
   const {
     pa_id: t,
-    patient_fname: s,
-    patient_lname: o,
-    patient_dob: n,
-    drug: e,
+    patient_fname: n,
+    patient_lname: e,
+    patient_dob: a,
+    drug: s,
     submitted_by: i,
-    patientId: r
-  } = a, u = /* @__PURE__ */ new Date(), d = String(u.getMonth() + 1).padStart(2, "0"), f = String(u.getDate()).padStart(2, "0"), g = u.getFullYear(), l = `${d}/${f}/${g}`;
-  function h(S) {
-    const m = String(S ?? "");
-    return m.includes(",") || m.includes('"') || m.includes(`
-`) ? `"${m.replace(/"/g, '""')}"` : m;
+    insurance: r,
+    patientId: g,
+    npi: u
+  } = o, p = /* @__PURE__ */ new Date(), h = String(p.getMonth() + 1).padStart(2, "0"), c = String(p.getDate()).padStart(2, "0"), m = p.getFullYear(), P = `${h}/${c}/${m}`;
+  function y(E) {
+    const l = String(E ?? "");
+    return l.includes(",") || l.includes('"') || l.includes(`
+`) ? `"${l.replace(/"/g, '""')}"` : l;
   }
-  const _ = [
+  const d = [
     `=HYPERLINK("https://dashboard.covermymeds.com/v2/requests/${t}", "${t}")`,
-    s,
-    o,
     n,
     e,
+    a,
+    s,
     i,
-    l,
+    P,
     "Pending",
+    r,
+    g,
     "",
-    r
-  ].map(h).join(",") + `
-`, { pa_csv_log: y = F } = await chrome.storage.local.get(I), c = y + _;
-  await chrome.storage.local.set({ [I]: c }), await B(c);
+    // blank space for additional info
+    u
+  ].map(y).join(",") + `
+`, { pa_csv_log: C = k } = await chrome.storage.local.get(N), A = C + d;
+  await chrome.storage.local.set({ [N]: A }), await U(A);
 }
-async function B(a) {
-  const { pa_csv_log: t = F } = await chrome.storage.local.get(I), o = "data:text/csv;charset=utf-8," + encodeURIComponent(a || t);
+async function U(o) {
+  const { pa_csv_log: t = k } = await chrome.storage.local.get(N), e = "data:text/csv;charset=utf-8," + encodeURIComponent(o || t);
   chrome.downloads.download({
-    url: o,
+    url: e,
     filename: "pa_log.csv",
     conflictAction: "overwrite",
     saveAs: !1
-  }, (n) => {
-    console.log("[CSV Logger] download triggered:", n);
+  }, (a) => {
+    console.log("[CSV Logger] download triggered:", a);
   });
 }
-const p = /* @__PURE__ */ new Map(), v = /* @__PURE__ */ new Set();
-function U() {
-  const a = /* @__PURE__ */ new Date(), t = a.getFullYear(), s = String(a.getMonth() + 1).padStart(2, "0"), o = String(a.getDate()).padStart(2, "0");
-  return `${t}-${s}-${o}`;
-}
+const f = /* @__PURE__ */ new Map(), v = /* @__PURE__ */ new Set();
 setInterval(() => {
   console.log("===Processed PAs===");
-  for (const [a, t] of p.entries())
-    console.log(`PA id: ${a}: downloaded - ${t.downloaded}`);
+  for (const [o, t] of f.entries())
+    console.log(`PA id: ${o}: downloaded - ${t.downloaded}`);
 }, 5e3);
-async function j(a) {
+async function G(o) {
   let t;
-  if ((a.url.includes("dashboard.covermymeds.com/api/requests/") || a.url.includes("www.covermymeds.com/request/faxconfirmation/")) && (t = a.url.split("/")[5].split("?")[0]), !t || v.has(t)) return;
-  const s = p.get(t);
-  if (s != null && s.downloaded) {
+  if ((o.url.includes("dashboard.covermymeds.com/api/requests/") || o.url.includes("www.covermymeds.com/request/faxconfirmation/")) && (t = o.url.split("/")[5].split("?")[0]), !t || v.has(t)) return;
+  const n = f.get(t);
+  if (n != null && n.downloaded) {
     console.log(`[PA ${t}] Ignored`);
     return;
   }
   v.add(t);
   try {
-    p.has(t) || p.set(t, { downloaded: !1 });
-    const o = await C(t), {
-      patient_fname: n,
-      patient_lname: e,
+    f.has(t) || f.set(t, { downloaded: !1 });
+    const e = await T(t), {
+      patient_fname: a,
+      patient_lname: s,
       patient_dob: i,
       drug: r,
-      submitted_by: u,
-      epa_status_description: d,
-      workflow_status: f,
-      submitted_by_user_category: g,
-      completed: l,
-      status_dialog: h,
-      status_dialog_loading: _,
-      sent: y
-    } = o;
-    console.log("Processing PA:", t, n, e, r);
-    const c = d === "PA Request - Sent to Plan" || a.url.includes(`faxconfirmation/${t}`), S = d === "PA Response" || f === "Sent to Plan" && !y.includes(U()) || f === "Archived" || d === "Question Response" && l !== "false" || d === "PA Request - Sent to Plan" && _.includes("information has been submitted");
+      submitted_by: g,
+      epa_status_description: u,
+      workflow_status: p,
+      submitted_by_user_category: h,
+      completed: c,
+      insurance: m,
+      // status_dialog,
+      sent: P,
+      npi: y
+    } = e;
+    console.log("[backgound.js] PA INFO: ", e), console.log("Processing PA:", t, a, s, r);
+    const d = u === "PA Request - Sent to Plan" || o.url.includes(`faxconfirmation/${t}`);
     if (console.warn(`Status for ${t}
-isUploadCase - ${c}
-isTerminalCase - ${S}
-Details url - ${a.url}`), !p.get(t).downloaded && c) {
+isUploadCase - ${d}
+isTerminalCase - ${u === "PA Response" || // (workflow_status === "Sent to Plan" && !sent.includes(getTodayDay())) ||
+    p === "Archived" || u === "Question Response" && c !== "false"}
+Details url - ${o.url}`), !f.get(t).downloaded && d) {
       console.warn("Inside the if statement with conditional check");
-      const m = await T(t, n, e, r), L = await N(m);
-      console.log(`[PA ${t}] Downloaded file path:`, L);
-      const b = await k(i, n, e);
-      if (console.log("Ema Patient:", b), b != null && b.length) {
-        const { id: D } = b[0];
-        console.log(`[PA ${t}] Uploading PDF for patientId=${D}`), p.get(t).downloaded != !0 && await O({ pa_id: t, patient_fname: n, patient_lname: e, patient_dob: i, drug: r, submitted_by: u, patientId: D }), p.get(t).downloaded = !0;
+      const A = await F(t, a, s, r), E = await L(A);
+      console.log(`[PA ${t}] Downloaded file path:`, E);
+      const l = await R(i, a, s);
+      if (console.log("Ema Patient:", l), l != null && l.length) {
+        const { id: D } = l[0];
+        console.log(`[PA ${t}] Uploading PDF for patientId=${D}`), f.get(t).downloaded != !0 && await B({
+          pa_id: t,
+          patient_fname: a,
+          patient_lname: s,
+          patient_dob: i,
+          drug: r,
+          submitted_by: g,
+          insurance: m,
+          patientId: D,
+          npi: y
+        }), f.get(t).downloaded = !0;
         let $ = null;
         try {
-          const A = (await chrome.tabs.query({})).find((E) => {
-            var P;
-            return (P = E.url) == null ? void 0 : P.includes("ema.md");
+          const b = (await chrome.tabs.query({})).find((S) => {
+            var _;
+            return (_ = S.url) == null ? void 0 : _.includes("ema.md");
           });
-          A && ($ = A.id, console.log(`[PA ${t}] Found EMA tab ID:`, $));
+          b && ($ = b.id, console.log(`[PA ${t}] Found EMA tab ID:`, $));
         } catch (w) {
           console.error(`[PA ${t}] Error finding EMA tab:`, w);
         }
@@ -240,36 +272,36 @@ Details url - ${a.url}`), !p.get(t).downloaded && c) {
             { credentials: "include" }
           );
           if (!w.ok) throw new Error(`PDF fetch failed: ${w.statusText}`);
-          const A = await w.blob(), E = `${n}-${e}-${r}.pdf`, P = new File([A], E, { type: "application/pdf" }), q = [{
-            patient: { id: String(D), lastName: e, firstName: n },
+          const b = await w.blob(), S = `${a}-${s}-${r}.pdf`, _ = new File([b], S, { type: "application/pdf" }), q = [{
+            patient: { id: String(D), lastName: s, firstName: a },
             additionalInfo: { performedDate: (/* @__PURE__ */ new Date()).toISOString() },
-            fileName: P.name,
+            fileName: _.name,
             title: `${r} pa submitted: ${(/* @__PURE__ */ new Date()).toLocaleDateString()}`
-          }], x = await R($, q, P);
-          console.log(`[PA ${t}] EMA upload result:`, x);
+          }], M = await O($, q, _);
+          console.log(`[PA ${t}] EMA upload result:`, M);
         }
       }
     } else
       return;
-  } catch (o) {
-    console.error(`[PA ${t}] Error:`, o);
+  } catch (e) {
+    console.error(`[PA ${t}] Error:`, e);
     return;
   } finally {
     v.delete(t);
   }
 }
 chrome.webRequest.onCompleted.addListener(
-  j,
+  G,
   { urls: ["*://*.covermymeds.com/*"] }
 );
-async function G(a) {
+async function H(o) {
   try {
-    const t = await C(a), { patient_fname: s, patient_lname: o, drug: n } = t, e = await T(a, s, o, n), i = await N(e);
+    const t = await T(o), { patient_fname: n, patient_lname: e, drug: a } = t, s = await F(o, n, e, a), i = await L(s);
     console.log("[Manual] PDF path:", i);
   } catch (t) {
-    console.error(`[Manual] Error in pdfManipulation for PA ID ${a}:`, t);
+    console.error(`[Manual] Error in pdfManipulation for PA ID ${o}:`, t);
   }
 }
 export {
-  G as pdfManipulation
+  H as pdfManipulation
 };

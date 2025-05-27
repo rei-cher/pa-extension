@@ -16,6 +16,25 @@ function extractPatientDOB(data) {
   return null;
 }
 
+function findProviderNpiAnswer(obj) {
+    if (Array.isArray(obj)) {
+        for (const item of obj) {
+            const result = findProviderNpiAnswer(item);
+            if (result) return result;
+        }
+    } 
+    else if (typeof obj === 'object' && obj !== null) {
+        if (obj.name === "provider_npi" && "answer_text" in obj) {
+            return obj.answer_text;
+        }
+        for (const key in obj) {
+            const result = findProviderNpiAnswer(obj[key]);
+            if (result) return result;
+        }
+    }
+    return null;
+}
+
 export async function getPAInfo(pa_id) {
     console.log(`Getting patient info with ID - ${pa_id}`)
     const url = `https://dashboard.covermymeds.com/api/requests/${pa_id}?`;
@@ -47,9 +66,11 @@ export async function getPAInfo(pa_id) {
         workflow_status: data.workflow_status,
         submitted_by_user_category: data.submitted_by_user_category,
         completed: data.completed,
-        status_dialog: data.status_dialog_loading?.text ? data.status_dialog_loading.text : null,
-        status_dialog_loading: data.status_dialog_loading?.text ? data.status_dialog_loading.text : null,
-        sent: data?.sent ? data.sent : null
+        insurance: data.form_description.split(" ")[0],
+        // status_dialog: data.status_dialog_loading?.text ? data.status_dialog_loading.text : null,
+        // status_dialog_loading: data.status_dialog_loading?.text ? data.status_dialog_loading.text : null,
+        sent: data?.sent ? data.sent : null,
+        npi: findProviderNpiAnswer(data)
       };
       
     } 

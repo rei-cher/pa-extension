@@ -17,7 +17,9 @@ const CSV_HEADER = [
     'Submitted at',
     'Status',
     'Insurance',
-    'Pt Ema ID'
+    'Pt Ema ID',
+    'Additional Info',
+    'NPI'
 ].join(',') + '\n';
 
 
@@ -89,7 +91,9 @@ export async function logPaDownload(paInfo) {
         patient_dob,
         drug,
         submitted_by,
-        patientId
+        insurance,
+        patientId,
+        npi
     } = paInfo;
 
     // Format current date as MM/DD/YYYY for the CSV timestamp
@@ -117,8 +121,10 @@ export async function logPaDownload(paInfo) {
         submitted_by,
         dateStamp,
         'Pending',
-        '',
-        patientId
+        insurance,
+        patientId,
+        '', // blank space for additional info
+        npi
     ].map(escapeCSVField).join(',') + '\n';
 
     // Retrieve existing CSV or start with header

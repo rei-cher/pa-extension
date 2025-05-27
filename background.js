@@ -27,6 +27,8 @@ function skipPA(pa_info) {
         status_dialog_loading
     } = pa_info;
 
+    // Cases when to skip and not listen
+    // epa_status_description.includes("Expired")
     // status_dialog_loading.includes("is unable to respond with clinical questions")
     // status_dialog.includes("You may close this dialog and return to your dashboard to perform other")
 }
@@ -76,11 +78,13 @@ async function handlePARequest(details) {
             workflow_status,
             submitted_by_user_category,
             completed,
-            status_dialog,
-            status_dialog_loading,
-            sent
+            insurance,
+            // status_dialog,
+            sent,
+            npi
         } = pa_info;
 
+        console.log("[backgound.js] PA INFO: ",pa_info);
         console.log("Processing PA:", pa_id, patient_fname, patient_lname, drug);
 
         const isUploadCase =
@@ -89,10 +93,10 @@ async function handlePARequest(details) {
 
         const isTerminalCase =
             epa_status_description === "PA Response" ||
-            (workflow_status === "Sent to Plan" && !sent.includes(getTodayDay())) ||
+            // (workflow_status === "Sent to Plan" && !sent.includes(getTodayDay())) ||
             workflow_status === "Archived" ||
-            (epa_status_description === "Question Response" && completed !== "false") ||
-            (epa_status_description === "PA Request - Sent to Plan" && status_dialog_loading.includes("information has been submitted"));
+            (epa_status_description === "Question Response" && completed !== "false")
+            // (epa_status_description === "PA Request - Sent to Plan" && status_dialog_loading.includes("information has been submitted"));
 
         
         console.warn(`Status for ${pa_id}\nisUploadCase - ${isUploadCase}\nisTerminalCase - ${isTerminalCase}\nDetails url - ${details.url}`)
@@ -115,7 +119,17 @@ async function handlePARequest(details) {
                 // check if the pa download status is not true
                 // if not, then log to csv, otherwise - skip
                 if (processedPA.get(pa_id).downloaded != true) {
-                    await logPaDownload({ pa_id, patient_fname, patient_lname, patient_dob, drug, submitted_by, patientId });
+                    await logPaDownload({ 
+                        pa_id, 
+                        patient_fname, 
+                        patient_lname, 
+                        patient_dob, 
+                        drug, 
+                        submitted_by,
+                        insurance,
+                        patientId,
+                        npi
+                    });
                 }
                 
                 // Mark as downloaded
