@@ -293,16 +293,12 @@ chrome.webRequest.onCompleted.addListener(
             await handlePARequest({ url, source: 'webRequest' });
         }
     },
-    { urls: ["*://*.covermymeds.com/api/requests/*"] }
+    { urls: ["*://*.covermymeds.com/api/requests/*", "*://*.covermymeds.com/request/faxconfirmation/*"] }
 );
 
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-    const url = changeInfo.url || tab.url;
-    if (url && url.includes('faxconfirmation')) {
-        const pa_id = extractPAIdFromUrl(url);
-        if (pa_id && !processingPA.has(pa_id)) {
-            console.log(`[tabs.onUpdated] Detected faxconfirmation URL change: ${url}`);
-            handlePARequest({ url, source: 'tabs.onUpdated' });
-        }
-    }
-});
+// chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+//     if (changeInfo.status === "complete" && tab.url && tab.url.includes('/request/faxconfirmation/')){
+//         console.log(`[tabs.onUpdated] Page finished loading faxconfiramtion: ${tab.url}`)
+//         handlePARequest({ url: tab.url, source: 'tabs.onUpdated' });
+//     }
+// });
