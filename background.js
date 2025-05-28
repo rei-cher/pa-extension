@@ -9,6 +9,7 @@ import { logPaDownload } from "./func/csv-logger.js";
 const processedPA = new Map(); // pa_id => { downloaded: boolean }
 const processingPA = new Set();
 const ignoredPA = new Set();
+const download_trigger = new Map(); // map for download triggers to avoid dublicate downloads
 
 const PA_DONWLOADED_KEYS = "downloaded_pa_keys";
 
@@ -22,6 +23,7 @@ function getTodayDay(){
     return formattedDate;
 }
 
+// TODO: maybe not necessary
 function skipPA(pa_info) {
     const {
         epa_status_description, 
@@ -46,15 +48,21 @@ setInterval(() => {
 }, 30000)
 
 async function handlePARequest(details) {
+    console.log("=============\n\nDetails:\n\n", details,"\n\n=============")
+    console.log(`=============\n\n${details.url}\n\n=============`)
+    const url = details?.url;
+    const source = details.source;
+
     // console.warn("[background.js] Details url: ", details.url);
     // Extract PA ID from URL
     let pa_id;
     if (
-        details.url.includes('dashboard.covermymeds.com/api/requests/') ||
-        details.url.includes('www.covermymeds.com/request/faxconfirmation/')
+        url.includes('dashboard.covermymeds.com/api/requests/') ||
+        url.includes('www.covermymeds.com/request/faxconfirmation/')
     ) {
         const parts = details.url.split('/');
         pa_id = parts[5].split('?')[0];
+        console.log(`[handlePARequest] (${source}) Extracted PA ID: ${pa_id}`);
     }
 
     if (!pa_id || processingPA.has(pa_id)) return;
@@ -77,6 +85,7 @@ async function handlePARequest(details) {
         // Add to processedPA if not tracked yet
         if (!processedPA.has(pa_id) && !ignoredPA.has(pa_id)) {
             processedPA.set(pa_id, { downloaded: false });
+            download_trigger.set(pa_id, {triggered: false});
         }
 
         const pa_info = await getPAInfo(pa_id);
@@ -99,6 +108,8 @@ async function handlePARequest(details) {
             request_outcome
         } = pa_info;
 
+        console.warn("==========\nDetails before checking the isUploadCase: ", details)
+        console.warn(`==========\nURL before checking the isUploadCase: ${details.url}`)
         const isUploadCase =
             epa_status_description === "PA Request - Sent to Plan" ||
             details.url.includes(`faxconfirmation`);
@@ -122,12 +133,18 @@ async function handlePARequest(details) {
         console.log("[backgound.js] PA INFO: ",pa_info);
         console.log("Processing PA:", pa_id, patient_fname, patient_lname, drug);
         console.log(`==========\nStatuses pre-if statement:\nprocessedPA.get(pa_id).downloaded - ${processedPA.get(pa_id).downloaded}\ndownloaded_pa_keys[pa_id] - ${downloaded_pa_keys[pa_id]}\nisUploadCase - ${isUploadCase}\n==========`)
-        let overall_status = (!processedPA.get(pa_id).downloaded || !downloaded_pa_keys[pa_id]) && isUploadCase
+        let overall_status = (!processedPA.get(pa_id).downloaded || !downloaded_pa_keys[pa_id]) && isUploadCase && !download_trigger.get(pa_id).triggered
         console.log(`==========\n Overall status - ${overall_status} \n==========`)
 
-        if ((!processedPA.get(pa_id).downloaded || !downloaded_pa_keys[pa_id]) && isUploadCase) {
+        // check if either - downloaded is false or pa is not in downloaded pa keys set
+        // and this is an upload case and download for pa was not triggered yet
+        if ((!processedPA.get(pa_id).downloaded || !downloaded_pa_keys[pa_id]) && isUploadCase && !download_trigger.get(pa_id).triggered) {
             console.log("==========\nInside the if statement with conditional check\n==========");
             const downloadId = await downloadPA(pa_id, patient_fname, patient_lname, drug);
+
+            // set downloaded triggere for pa as true to avoid repited downloads
+            download_trigger.get(pa_id).triggered = true;
+            console.log(`[PA Trigger status] PA ${pa_id} - ${download_trigger.get(pa_id).triggered}`)
             const filepath = await waitForDownloadFilename(downloadId);
             console.log(`[PA ${pa_id}] Downloaded file path:`, filepath);
 
@@ -240,17 +257,52 @@ async function handlePARequest(details) {
 }
 
 // Listener for PA requests
+// chrome.webRequest.onCompleted.addListener(
+//     handlePARequest,
+//     { urls: ["*://*.covermymeds.com/*"] }
+// );
+
+function extractPAIdFromUrl(url) {
+    try {
+        const urlObj = new URL(url);
+        const pathname = urlObj.pathname;
+
+        // Example: /request/faxconfirmation/BXBLL2V6
+        //          /api/requests/BXBLL2V6
+        const parts = pathname.split('/').filter(Boolean);
+
+        // Match known patterns
+        if (parts.includes('faxconfirmation') || parts.includes('requests')) {
+            return parts[parts.length - 1].split('?')[0];  // Just the PA ID
+        }
+
+        return null;
+    } catch (err) {
+        console.error("Invalid URL in extractPAIdFromUrl:", url);
+        return null;
+    }
+}
+
 chrome.webRequest.onCompleted.addListener(
-    handlePARequest,
-    { urls: ["*://*.covermymeds.com/*"] }
+    async (details) => {
+        const { url } = details;
+        const pa_id = extractPAIdFromUrl(url);
+
+        if (pa_id && !processingPA.has(pa_id) && url.includes('/api/requests/')) {
+            console.log(`[webRequest] API request detected for PA ID: ${pa_id}`);
+            await handlePARequest({ url, source: 'webRequest' });
+        }
+    },
+    { urls: ["*://*.covermymeds.com/api/requests/*"] }
 );
 
-// listener to the tab change
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-    if (changeInfo.url && changeInfo.url.includes('faxconfirmation')){
-        const details = { url: changeInfo.url };
-
-        console.log(`[tabs.onUpdated] Detected faxconfirmation URL change: ${changeInfo.url}`);
-        handlePARequest(details);
+    const url = changeInfo.url || tab.url;
+    if (url && url.includes('faxconfirmation')) {
+        const pa_id = extractPAIdFromUrl(url);
+        if (pa_id && !processingPA.has(pa_id)) {
+            console.log(`[tabs.onUpdated] Detected faxconfirmation URL change: ${url}`);
+            handlePARequest({ url, source: 'tabs.onUpdated' });
+        }
     }
-})
+});
