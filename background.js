@@ -8,6 +8,9 @@ import { logPaDownload } from "./func/csv-logger.js";
 // Utilities
 const processedPA = new Map(); // pa_id => { downloaded: boolean }
 const processingPA = new Set();
+const ignoredPA = new Set();
+
+const PA_DONWLOADED_KEYS = "downloaded_pa_keys";
 
 function getTodayDay(){
     const today = new Date()
@@ -38,9 +41,12 @@ setInterval(() => {
     for (const [pa_id, state] of processedPA.entries()){
         console.log(`PA id: ${pa_id}: downloaded - ${state.downloaded}`);
     }
+    console.log("===Skipped PAs===");
+    ignoredPA.forEach(pa => {console.log(pa)});
 }, 30000)
 
 async function handlePARequest(details) {
+    // console.warn("[background.js] Details url: ", details.url);
     // Extract PA ID from URL
     let pa_id;
     if (
@@ -54,8 +60,14 @@ async function handlePARequest(details) {
     if (!pa_id || processingPA.has(pa_id)) return;
 
     const state = processedPA.get(pa_id);
-    if (state?.downloaded) {
-        console.log(`[PA ${pa_id}] Ignored`);
+
+    let downloaded_pa_keys_obj  = await chrome.storage.local.get(PA_DONWLOADED_KEYS);
+    const downloaded_pa_keys = downloaded_pa_keys_obj[PA_DONWLOADED_KEYS] || {};
+
+
+    // skip (don't listen) if the pa_id has 'downloaded = true', it is in ignored list, or it was prev downloaded (in local storage of downloaded pas)
+    if (state?.downloaded || ignoredPA.has(pa_id) || downloaded_pa_keys[pa_id]) {
+        console.warn(`[PA ${pa_id}] Ignored`);
         return;
     }
 
@@ -63,7 +75,7 @@ async function handlePARequest(details) {
 
     try {
         // Add to processedPA if not tracked yet
-        if (!processedPA.has(pa_id)) {
+        if (!processedPA.has(pa_id) && !ignoredPA.has(pa_id)) {
             processedPA.set(pa_id, { downloaded: false });
         }
 
@@ -75,6 +87,7 @@ async function handlePARequest(details) {
             drug,
             submitted_by,
             epa_status,
+            epa_status_description,
             workflow_status,
             submitted_by_user_category,
             completed,
@@ -82,25 +95,38 @@ async function handlePARequest(details) {
             status_dialog,
             status_dialog_loading,
             sent,
-            npi
+            npi,
+            request_outcome
         } = pa_info;
 
+        const isUploadCase =
+            epa_status_description === "PA Request - Sent to Plan" ||
+            details.url.includes(`faxconfirmation`);
+
+        
+        const isTerminalCase =
+            ["Unknown", "Favorable", "Unfavorable"].includes(request_outcome) ||
+            (workflow_status === "Sent to Plan" && !sent.includes(getTodayDay()))
+
+        if (isTerminalCase) {
+            console.log(`========== [PA ${pa_id}] Terminal case — skipping future ==========`);
+            // TODO: stop listening to this pa_id
+            ignoredPA.add(pa_id);
+            return;
+        }
+
+        console.log(`========\nChecking isUploadCase: epa_status=${epa_status}, url=${details.url}\n=======`);
+            
+        console.log(`========\nStatuses: isUploadCase - ${isUploadCase}, isTerminalCase - ${isTerminalCase}\n========`)
+                
         console.log("[backgound.js] PA INFO: ",pa_info);
         console.log("Processing PA:", pa_id, patient_fname, patient_lname, drug);
+        console.log(`==========\nStatuses pre-if statement:\nprocessedPA.get(pa_id).downloaded - ${processedPA.get(pa_id).downloaded}\ndownloaded_pa_keys[pa_id] - ${downloaded_pa_keys[pa_id]}\nisUploadCase - ${isUploadCase}\n==========`)
+        let overall_status = (!processedPA.get(pa_id).downloaded || !downloaded_pa_keys[pa_id]) && isUploadCase
+        console.log(`==========\n Overall status - ${overall_status} \n==========`)
 
-        const isUploadCase =
-            epa_status === "PA Request - Sent to Plan" ||
-            details.url.includes(`faxconfirmation/${pa_id}`);
-
-        const isTerminalCase =
-            epa_status === "PA Response" ||
-            workflow_status === "Sent to Plan" ||
-            workflow_status === "Archived" ||
-            (epa_status === "Question Response" && completed !== "false") ||
-            (epa_status === "PA Request - Sent to Plan" && status_dialog_loading.length);
-
-        if (!processedPA.get(pa_id).downloaded && isUploadCase){ // && !isTerminalCase) {
-            console.warn("Inside the if statement with conditional check");
+        if ((!processedPA.get(pa_id).downloaded || !downloaded_pa_keys[pa_id]) && isUploadCase) {
+            console.log("==========\nInside the if statement with conditional check\n==========");
             const downloadId = await downloadPA(pa_id, patient_fname, patient_lname, drug);
             const filepath = await waitForDownloadFilename(downloadId);
             console.log(`[PA ${pa_id}] Downloaded file path:`, filepath);
@@ -132,6 +158,12 @@ async function handlePARequest(details) {
                 // Mark as downloaded
                 processedPA.get(pa_id).downloaded = true;
 
+                // Add the new pa_id
+                downloaded_pa_keys[pa_id] = true;
+
+                // Save it back to storage
+                await chrome.storage.local.set({ [PA_DONWLOADED_KEYS]: downloaded_pa_keys });
+
                 let emaTabId = null;
                 try {
                     const tabs = await chrome.tabs.query({});
@@ -146,25 +178,25 @@ async function handlePARequest(details) {
 
                 if (emaTabId) {
                     // try {
-                        const resp = await fetch(
-                            `https://dashboard.covermymeds.com/api/requests/${pa_id}/download`,
-                            { credentials: 'include' }
-                        );
-                        if (!resp.ok) throw new Error(`PDF fetch failed: ${resp.statusText}`);
+                        // const resp = await fetch(
+                        //     `https://dashboard.covermymeds.com/api/requests/${pa_id}/download`,
+                        //     { credentials: 'include' }
+                        // );
+                        // if (!resp.ok) throw new Error(`PDF fetch failed: ${resp.statusText}`);
 
-                        const pdfBlob = await resp.blob();
-                        const fileName = `${patient_fname}-${patient_lname}-${drug}.pdf`;
-                        const fileObj = new File([pdfBlob], fileName, { type: 'application/pdf' });
+                        // const pdfBlob = await resp.blob();
+                        // const fileName = `${patient_fname}-${patient_lname}-${drug}.pdf`;
+                        // const fileObj = new File([pdfBlob], fileName, { type: 'application/pdf' });
 
-                        const dtoList = [{
-                            patient: { id: String(patientId), lastName: patient_lname, firstName: patient_fname },
-                            additionalInfo: { performedDate: new Date().toISOString() },
-                            fileName: fileObj.name,
-                            title: `${drug} pa submitted: ${new Date().toLocaleDateString()}`
-                        }];
+                        // const dtoList = [{
+                        //     patient: { id: String(patientId), lastName: patient_lname, firstName: patient_fname },
+                        //     additionalInfo: { performedDate: new Date().toISOString() },
+                        //     fileName: fileObj.name,
+                        //     title: `${drug} pa submitted: ${new Date().toLocaleDateString()}`
+                        // }];
 
-                        const uploadResult = await uploadPdf(emaTabId, dtoList, fileObj);
-                        console.log(`[PA ${pa_id}] EMA upload result:`, uploadResult);
+                        // const uploadResult = await uploadPdf(emaTabId, dtoList, fileObj);
+                        // console.log(`[PA ${pa_id}] EMA upload result:`, uploadResult);
                     // } catch (uploadErr) {
                     //     console.error(`[PA ${pa_id}] Upload error:`, uploadErr);
                     // }
@@ -176,6 +208,7 @@ async function handlePARequest(details) {
         }
     } catch (error) {
         console.error(`[PA ${pa_id}] Error:`, error);
+        // ignoredPA.add(pa_id);
     } finally {
         processingPA.delete(pa_id);
     }
@@ -186,3 +219,13 @@ chrome.webRequest.onCompleted.addListener(
     handlePARequest,
     { urls: ["*://*.covermymeds.com/*"] }
 );
+
+// listener to the tab change
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    if (changeInfo.url && changeInfo.url.includes('faxconfirmation')){
+        const details = { url: changeInfo.url };
+
+        console.log(`[tabs.onUpdated] Detected faxconfirmation URL change: ${changeInfo.url}`);
+        handlePARequest(details);
+    }
+})

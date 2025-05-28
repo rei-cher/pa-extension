@@ -62,6 +62,7 @@ export async function getPAInfo(pa_id) {
         patient_dob: extractPatientDOB(data),
         drug: data.drug.split(' ')[0],
         submitted_by: data.submitted_by,
+        epa_status: data.ePA_Status,
         epa_status_description: data.ePA_Status_description,
         workflow_status: data.workflow_status,
         submitted_by_user_category: data.submitted_by_user_category,
@@ -70,7 +71,8 @@ export async function getPAInfo(pa_id) {
         status_dialog: data.status_dialog_loading?.text ? data.status_dialog_loading.text : null,
         status_dialog_loading: data.status_dialog_loading?.text ? data.status_dialog_loading.text : null,
         sent: data?.sent ? data.sent : null,
-        npi: findProviderNpiAnswer(data)
+        npi: findProviderNpiAnswer(data),
+        request_outcome: data?.request_outcome ? data.request_outcome : null
       };
       
     } 

@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "Prior Authorization Autoupload",
-    "version": "1.2.1",
+    "version": "1.2.5",
     "description": "Auto dowload, rename, and upload faxed PA from covermymeds into emd.md",
     "permissions": [
         "tabs", 
@@ -19,13 +19,6 @@
         "https://www.googleapis.com/*",
         "https://sheets.googleapis.com/*"
     ],
-    "declarative_net_request": {
-        "rule_resources": [{
-            "id": "ruleset_1",
-            "enabled": true,
-            "path": "cors_rules.json"
-        }]
-    },
     "oauth2": {
         "client_id": "820508291637-buhkene7s9rm9ia28bm05iidctnjh1q9.apps.googleusercontent.com",
         "scopes": [

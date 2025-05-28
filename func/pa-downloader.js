@@ -1,5 +1,5 @@
 export async function downloadPA(pa_id, pt_fname, pt_lname, med) {
-    console.warn("[pa-downloader] Download function is called");
+    console.log("=======\n[pa-downloader] Download function is called\n========");
     return new Promise((resolve, reject) => {
         const pdfUrl = `https://dashboard.covermymeds.com/api/requests/${pa_id}/download`;
         console.log("downloadPA called:", pdfUrl);

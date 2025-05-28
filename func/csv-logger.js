@@ -3,9 +3,6 @@
 
 const STORAGE_KEY = 'pa_csv_log';
 
-const SPREADSHEET_ID = '1NvSE5xwn5TM1iy_PXK-_ckk3F7-LZ3ksdHvNlOaY1es';
-const SHEET_NAME = 'PA Status';
-
 // Header line for a new CSV
 const CSV_HEADER = [
     'pa_id',
@@ -21,63 +18,6 @@ const CSV_HEADER = [
     'Additional Info',
     'NPI'
 ].join(',') + '\n';
-
-
-// OAuth2 token for Sheets API
-function getSheetsToken() {
-    return new Promise((resolve, reject) => {
-        chrome.identity.getAuthToken({ interactive: true }, token => {
-        if (chrome.runtime.lastError || !token) {
-            return reject(chrome.runtime.lastError);
-        }
-        resolve(token);
-        });
-    });
-}
-
-async function appendRowToSheet(rowValues) {
-    const token = await getSheetsToken();
-
-    // just the header cell
-    const range = `'${SHEET_NAME}'!A1`;
-
-    // encode everything, then make sure ' and ! are escaped
-    const encodedRange = encodeURIComponent(range);
-
-    const url =
-        `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values:append` +
-        `?valueInputOption=RAW` +
-        `&insertDataOption=INSERT_ROWS` +
-        `&range=${encodedRange}`;
-
-    const body = { values: [ rowValues ] };
-  
-    const resp = await fetch(url, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type':  'application/json',
-        },
-        body: JSON.stringify(body)
-    });
-  
-    // grab the raw text so we can inspect HTML or JSON
-    const text = await resp.text();
-    const contentType = resp.headers.get('content-type') || '';
-
-    if (!resp.ok) {
-        console.error('[Sheets] bad response:', resp.status, resp.statusText, '\n', text);
-        throw new Error(`Sheets API returned HTTP ${resp.status}`);
-    }
-
-    if (contentType.includes('application/json')) {
-        return JSON.parse(text);
-    } 
-    else {
-        console.error('[Sheets] unexpected content-type:', contentType, '\n', text);
-        throw new Error('Sheets API returned non‑JSON response (see console for HTML)');
-    }
-}
 
 /**
      * Append one new row of PA info to the CSV log and trigger a download.
