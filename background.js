@@ -53,6 +53,81 @@ async function handlePARequest(details) {
     const url = details?.url;
     const source = details.source;
 
+    // force download if webNavigation is faxconfirmation
+    if (source === 'webNavigation' && url.includes('/request/faxconfirmation/')){
+        console.log('[handlePARequest] forced upload on faxconfirmation navigation');
+        const pa_id = extractPAIdFromUrl(url);
+
+        const pa_info = await getPAInfo(pa_id);
+
+        const { patient_fname, patient_lname, drug } = pa_info;
+
+        const downloadId = await downloadPA(pa_id, patient_fname, patient_lname, drug);
+
+        download_trigger.get(pa_id).triggered = true;
+
+        console.log(`[PA Trigger status] PA ${pa_id} - ${download_trigger.get(pa_id).triggered}`)
+        const filepath = await waitForDownloadFilename(downloadId);
+        console.log(`[PA ${pa_id}] Downloaded file path:`, filepath);
+
+        const matches = await findEmaPatient(patient_dob, patient_fname, patient_lname);
+
+        if (matches?.length) {
+            const { id: patientId } = matches[0];
+            console.log(`[PA ${pa_id}] Uploading PDF for patientId=${patientId}`);
+            
+            // check if the pa download status is not true
+            // if not, then log to csv, otherwise - skip
+            if (processedPA.get(pa_id).downloaded != true) {
+                await logPaDownload({ 
+                    pa_id, 
+                    patient_fname, 
+                    patient_lname, 
+                    patient_dob, 
+                    drug, 
+                    submitted_by,
+                    insurance,
+                    patientId,
+                    npi
+                });
+            }
+            
+            // Mark as downloaded
+            processedPA.get(pa_id).downloaded = true;
+
+            // Add the new pa_id
+            downloaded_pa_keys[pa_id] = true;
+
+            // Save it back to storage
+            await chrome.storage.local.set({ [PA_DONWLOADED_KEYS]: downloaded_pa_keys });
+        }
+        else {
+            if (processedPA.get(pa_id).downloaded != true) {
+                const temp_pt_id = "";
+                await logPaDownload({ 
+                    pa_id, 
+                    patient_fname, 
+                    patient_lname, 
+                    patient_dob, 
+                    drug, 
+                    submitted_by,
+                    insurance,
+                    temp_pt_id,
+                    npi
+                });
+            }
+            
+            // Mark as downloaded
+            processedPA.get(pa_id).downloaded = true;
+
+            // Add the new pa_id
+            downloaded_pa_keys[pa_id] = true;
+
+            // Save it back to storage
+            await chrome.storage.local.set({ [PA_DONWLOADED_KEYS]: downloaded_pa_keys });
+        }
+    }
+
     // console.warn("[background.js] Details url: ", details.url);
     // Extract PA ID from URL
     let pa_id;
@@ -303,3 +378,19 @@ chrome.webRequest.onCompleted.addListener(
 //         handlePARequest({ url: tab.url, source: 'tabs.onUpdated' });
 //     }
 // });
+
+chrome.webNavigation.onCompleted.addListener(details => {
+    const url = details.url;
+    console.log(`[webNavigation] Completed: ${url}`);
+    if (url.includes('/request/faxconfirmation/')){
+        handlePARequest({ url, source: 'webNavigation' });
+    }
+}, {
+    url: [
+        {
+            hostSuffix: 'covermymeds.com',
+            pathContains: '/request/faxconfirmation/'
+        }
+    ],
+    frameId: 0
+});
