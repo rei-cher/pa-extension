@@ -58,13 +58,33 @@ async function handlePARequest(details) {
         console.log('[handlePARequest] forced upload on faxconfirmation navigation');
         const pa_id = extractPAIdFromUrl(url);
 
+        download_trigger.set(pa_id, {triggered: false})
+
         const pa_info = await getPAInfo(pa_id);
 
-        const { patient_fname, patient_lname, drug } = pa_info;
+        const {
+            patient_fname,
+            patient_lname,
+            patient_dob,
+            drug,
+            submitted_by,
+            epa_status,
+            epa_status_description,
+            workflow_status,
+            submitted_by_user_category,
+            completed,
+            insurance,
+            status_dialog,
+            status_dialog_loading,
+            sent,
+            npi,
+            request_outcome
+        } = pa_info;
 
-        const downloadId = await downloadPA(pa_id, patient_fname, patient_lname, drug);
-
-        download_trigger.get(pa_id).triggered = true;
+        if (!download_trigger.get(pa_id).triggered){
+            const downloadId = await downloadPA(pa_id, patient_fname, patient_lname, drug);
+            download_trigger.get(pa_id).triggered = true;
+        }
 
         console.log(`[PA Trigger status] PA ${pa_id} - ${download_trigger.get(pa_id).triggered}`)
         const filepath = await waitForDownloadFilename(downloadId);
@@ -126,6 +146,8 @@ async function handlePARequest(details) {
             // Save it back to storage
             await chrome.storage.local.set({ [PA_DONWLOADED_KEYS]: downloaded_pa_keys });
         }
+
+        return;
     }
 
     // console.warn("[background.js] Details url: ", details.url);
