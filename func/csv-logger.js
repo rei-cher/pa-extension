@@ -62,7 +62,7 @@ export async function logPaDownload(paInfo) {
         dateStamp,
         'Pending',
         insurance,
-        patientId,
+        `=HYPERLINK("https://khasak.ema.md/ema/web/practice/staff#/practice/staff/patient/${patientId}/chart/overview", "${pa_id}")`,
         '', // blank space for additional info
         npi
     ].map(escapeCSVField).join(',') + '\n';

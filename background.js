@@ -111,13 +111,14 @@ async function handlePARequest(details) {
         console.warn("==========\nDetails before checking the isUploadCase: ", details)
         console.warn(`==========\nURL before checking the isUploadCase: ${details.url}`)
         const isUploadCase =
-            epa_status_description === "PA Request - Sent to Plan" ||
-            details.url.includes(`faxconfirmation`);
+            (epa_status_description === "PA Request - Sent to Plan" && sent?.includes(getTodayDay())) ||
+            url.includes(`faxconfirmation`);
 
         
         const isTerminalCase =
             ["Unknown", "Favorable", "Unfavorable"].includes(request_outcome) ||
-            (workflow_status === "Sent to Plan" && !sent.includes(getTodayDay()))
+            (workflow_status === "Sent to Plan" && !sent.includes(getTodayDay())) ||
+            (epa_status_description?.includes("PA Request - Sent to Plan") && !sent?.includes(getTodayDay()) )
 
         if (isTerminalCase) {
             console.log(`========== [PA ${pa_id}] Terminal case — skipping future ==========`);
@@ -126,7 +127,7 @@ async function handlePARequest(details) {
             return;
         }
 
-        console.log(`========\nChecking isUploadCase: epa_status=${epa_status}, url=${details.url}\n=======`);
+        console.log(`========\nChecking isUploadCase: epa_status=${epa_status}, url=${url}\n=======`);
             
         console.log(`========\nStatuses: isUploadCase - ${isUploadCase}, isTerminalCase - ${isTerminalCase}\n========`)
                 
@@ -288,7 +289,7 @@ chrome.webRequest.onCompleted.addListener(
         const { url } = details;
         const pa_id = extractPAIdFromUrl(url);
 
-        if (pa_id && !processingPA.has(pa_id) && url.includes('/api/requests/')) {
+        if (pa_id && !processingPA.has(pa_id) && (url.includes('/api/requests/') || url.includes('/request/faxconfirmation/') )) {
             console.log(`[webRequest] API request detected for PA ID: ${pa_id}`);
             await handlePARequest({ url, source: 'webRequest' });
         }
