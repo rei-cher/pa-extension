@@ -98,19 +98,17 @@ async function handlePARequest(details) {
             
             // check if the pa download status is not true
             // if not, then log to csv, otherwise - skip
-            if (processedPA.get(pa_id).downloaded != true) {
-                await logPaDownload({ 
-                    pa_id, 
-                    patient_fname, 
-                    patient_lname, 
-                    patient_dob, 
-                    drug, 
-                    submitted_by,
-                    insurance,
-                    patientId,
-                    npi
-                });
-            }
+            await logPaDownload({ 
+                pa_id, 
+                patient_fname, 
+                patient_lname, 
+                patient_dob, 
+                drug, 
+                submitted_by,
+                insurance,
+                patientId,
+                npi
+            });
             
             // Mark as downloaded
             processedPA.get(pa_id).downloaded = true;
@@ -122,20 +120,18 @@ async function handlePARequest(details) {
             await chrome.storage.local.set({ [PA_DONWLOADED_KEYS]: downloaded_pa_keys });
         }
         else {
-            if (processedPA.get(pa_id).downloaded != true) {
-                const temp_pt_id = "";
-                await logPaDownload({ 
-                    pa_id, 
-                    patient_fname, 
-                    patient_lname, 
-                    patient_dob, 
-                    drug, 
-                    submitted_by,
-                    insurance,
-                    temp_pt_id,
-                    npi
-                });
-            }
+            const temp_pt_id = "";
+            await logPaDownload({ 
+                pa_id, 
+                patient_fname, 
+                patient_lname, 
+                patient_dob, 
+                drug, 
+                submitted_by,
+                insurance,
+                temp_pt_id,
+                npi
+            });
             
             // Mark as downloaded
             processedPA.get(pa_id).downloaded = true;
