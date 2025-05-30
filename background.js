@@ -28,7 +28,7 @@ function skipPA(pa_info) {
     const {
         epa_status_description, 
         workflow_status,
-        status_dialog,
+        status_dialog_sending,
         status_dialog_loading
     } = pa_info;
 
@@ -74,7 +74,7 @@ async function handlePARequest(details) {
             submitted_by_user_category,
             completed,
             insurance,
-            status_dialog,
+            status_dialog_sending,
             status_dialog_loading,
             sent,
             npi,
@@ -194,7 +194,7 @@ async function handlePARequest(details) {
             submitted_by_user_category,
             completed,
             insurance,
-            status_dialog,
+            status_dialog_sending,
             status_dialog_loading,
             sent,
             npi,
@@ -207,12 +207,16 @@ async function handlePARequest(details) {
             (epa_status_description === "PA Request - Sent to Plan" && sent?.includes(getTodayDay())) ||
             url.includes(`faxconfirmation`);
 
-        
+        console.log(`[backroung.js EPA STATUS DIALOG LOADING] ${status_dialog_loading}`)
+
         const isTerminalCase =
             ["Unknown", "Favorable", "Unfavorable"].includes(request_outcome) ||
             (workflow_status === "Sent to Plan" && !sent.includes(getTodayDay())) ||
-            (epa_status_description?.includes("PA Request - Sent to Plan") && !sent?.includes(getTodayDay()) )
-
+            (epa_status_description?.includes("PA Request - Sent to Plan") && !sent?.includes(getTodayDay()) ) ||
+            epa_status_description.includes("Expired") ||
+            ["is unable to respond with clinical questions", "is unable to retrieve the clinical questions"].some(str => status_dialog_loading.includes(str)) ||
+            status_dialog_sending.includes("You may close this dialog and return to your dashboard to perform other")
+            
         if (isTerminalCase) {
             console.log(`========== [PA ${pa_id}] Terminal case — skipping future ==========`);
             // TODO: stop listening to this pa_id
