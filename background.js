@@ -53,6 +53,9 @@ async function handlePARequest(details) {
     const url = details?.url;
     const source = details.source;
 
+    let downloaded_pa_keys_obj  = await chrome.storage.local.get(PA_DONWLOADED_KEYS);
+    const downloaded_pa_keys = downloaded_pa_keys_obj[PA_DONWLOADED_KEYS] || {};
+
     // force download if webNavigation is faxconfirmation
     if (source === 'webNavigation' && url.includes('/request/faxconfirmation/')){
         console.log('[handlePARequest] forced upload on faxconfirmation navigation');
@@ -84,40 +87,41 @@ async function handlePARequest(details) {
         if (!download_trigger.get(pa_id).triggered){
             const downloadId = await downloadPA(pa_id, patient_fname, patient_lname, drug);
             download_trigger.get(pa_id).triggered = true;
+            
+            console.log(`[PA Trigger status] PA ${pa_id} - ${download_trigger.get(pa_id).triggered}`)
+            const filepath = await waitForDownloadFilename(downloadId);
+            console.log(`[PA ${pa_id}] Downloaded file path:`, filepath);
+    
+            const matches = await findEmaPatient(patient_dob, patient_fname, patient_lname);
+    
+            if (matches?.length) {
+                const { id: patientId } = matches[0];
+                console.log(`[PA ${pa_id}] Uploading PDF for patientId=${patientId}`);
+                
+                // check if the pa download status is not true
+                // if not, then log to csv, otherwise - skip
+                await logPaDownload({ 
+                    pa_id, 
+                    patient_fname, 
+                    patient_lname, 
+                    patient_dob, 
+                    drug, 
+                    submitted_by,
+                    insurance,
+                    patientId,
+                    npi
+                });
+                
+                // Mark as downloaded
+                processedPA.get(pa_id).downloaded = true;
+    
+                // Add the new pa_id
+                downloaded_pa_keys[pa_id] = true;
+    
+                // Save it back to storage
+                await chrome.storage.local.set({ [PA_DONWLOADED_KEYS]: downloaded_pa_keys });
         }
 
-        console.log(`[PA Trigger status] PA ${pa_id} - ${download_trigger.get(pa_id).triggered}`)
-        const filepath = await waitForDownloadFilename(downloadId);
-        console.log(`[PA ${pa_id}] Downloaded file path:`, filepath);
-
-        const matches = await findEmaPatient(patient_dob, patient_fname, patient_lname);
-
-        if (matches?.length) {
-            const { id: patientId } = matches[0];
-            console.log(`[PA ${pa_id}] Uploading PDF for patientId=${patientId}`);
-            
-            // check if the pa download status is not true
-            // if not, then log to csv, otherwise - skip
-            await logPaDownload({ 
-                pa_id, 
-                patient_fname, 
-                patient_lname, 
-                patient_dob, 
-                drug, 
-                submitted_by,
-                insurance,
-                patientId,
-                npi
-            });
-            
-            // Mark as downloaded
-            processedPA.get(pa_id).downloaded = true;
-
-            // Add the new pa_id
-            downloaded_pa_keys[pa_id] = true;
-
-            // Save it back to storage
-            await chrome.storage.local.set({ [PA_DONWLOADED_KEYS]: downloaded_pa_keys });
         }
         else {
             const temp_pt_id = "";
@@ -161,10 +165,6 @@ async function handlePARequest(details) {
     if (!pa_id || processingPA.has(pa_id)) return;
 
     const state = processedPA.get(pa_id);
-
-    let downloaded_pa_keys_obj  = await chrome.storage.local.get(PA_DONWLOADED_KEYS);
-    const downloaded_pa_keys = downloaded_pa_keys_obj[PA_DONWLOADED_KEYS] || {};
-
 
     // skip (don't listen) if the pa_id has 'downloaded = true', it is in ignored list, or it was prev downloaded (in local storage of downloaded pas)
     if (state?.downloaded || ignoredPA.has(pa_id) || downloaded_pa_keys[pa_id]) {
@@ -215,7 +215,7 @@ async function handlePARequest(details) {
             (epa_status_description?.includes("PA Request - Sent to Plan") && !sent?.includes(getTodayDay()) ) ||
             epa_status_description.includes("Expired") ||
             ["is unable to respond with clinical questions", "is unable to retrieve the clinical questions"].some(str => status_dialog_loading.includes(str)) ||
-            status_dialog_sending.includes("You may close this dialog and return to your dashboard to perform other")
+            status_dialog_sending?.includes("You may close this dialog and return to your dashboard to perform other")
             
         if (isTerminalCase) {
             console.log(`========== [PA ${pa_id}] Terminal case — skipping future ==========`);
