@@ -35,6 +35,25 @@ function findProviderNpiAnswer(obj) {
     return null;
 }
 
+function findOutcome(obj) {
+  if (Array.isArray(obj)) {
+      for (const item of obj) {
+          const result = findOutcome(item);
+          if (result) return result;
+      }
+  } 
+  else if (typeof obj === 'object' && obj !== null) {
+      if (obj.name === "outcome" && "text" in obj) {
+          return obj.text;
+      }
+      for (const key in obj) {
+          const result = findOutcome(obj[key]);
+          if (result) return result;
+      }
+  }
+  return null;
+}
+
 export async function getPAInfo(pa_id) {
     console.log(`Getting patient info with ID - ${pa_id}`)
     const url = `https://dashboard.covermymeds.com/api/requests/${pa_id}?`;
@@ -72,7 +91,8 @@ export async function getPAInfo(pa_id) {
         status_dialog_loading: data.status_dialog_loading?.text ? data.status_dialog_loading.text : null,
         sent: data?.sent ? data.sent : null,
         npi: findProviderNpiAnswer(data),
-        request_outcome: data?.request_outcome ? data.request_outcome : null
+        request_outcome: data?.request_outcome ? data.request_outcome : null,
+        outcome: findOutcome(data)
       };
       
     } 
