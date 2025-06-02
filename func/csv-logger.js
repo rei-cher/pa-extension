@@ -112,7 +112,7 @@ export async function exportCsvLog(csvString) {
 
     chrome.downloads.download({
         url: dataUrl,
-        filename: 'pa_log.csv',
+        filename: 'pa_log_test.csv',
         conflictAction: 'overwrite',
         saveAs: false
     }, downloadId => {

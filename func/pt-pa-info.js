@@ -49,7 +49,7 @@ export async function getPAInfo(pa_id) {
       });
   
       if (!resp.ok) {
-        throw new Error(`HTTP ${resp.status}`);
+        
       }
   
       const data = await resp.json();
@@ -78,6 +78,6 @@ export async function getPAInfo(pa_id) {
     } 
     catch (error) {
       console.error('Error fetching PA info:', error);
-      throw error;
+      return;
     }
 }

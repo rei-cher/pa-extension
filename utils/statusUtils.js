@@ -37,15 +37,17 @@ export function isTerminalCase(pa_info, todayISO) {
 
     const outcomeMatch = ["Unknown", "Favorable", "Unfavorable"].includes(request_outcome);
     const sentIncludesToday = sent?.includes(todayISO);
-    const workflowStale = workflow_status === "Sent to Plan" && !sentIncludesToday;
-    const expired = epa_status_description.includes("Expired");
+    const workflowStale = (workflow_status === "Sent to Plan") && !sentIncludesToday;
+    const expired = epa_status_description?.includes("Expired");
     const unableLoading = [
         "is unable to respond with clinical questions",
         "is unable to retrieve the clinical questions",
-    ].some((substr) => status_dialog_loading.includes(substr));
+    ].some((substr) => status_dialog_loading?.includes(substr));
     const unableSending = status_dialog_sending?.includes(
         "You may close this dialog and return to your dashboard to perform other"
     );
+
+    console.log(`[teminal case outcome]\noutcomeMatch - ${outcomeMatch}\nworkflowStale - ${workflowStale}\nexpired - ${expired}\nunableLoading - ${unableLoading}\nunableSending - ${unableSending}\ntodayISO - ${todayISO}`)
 
     return Boolean(
         outcomeMatch ||

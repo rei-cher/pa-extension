@@ -88,3 +88,11 @@ export function initProcessedPA(pa_id) {
         processedPA.set(pa_id, { downloaded: false });
     }
 }
+
+/**
+ * For testing purposes (remove pa_id)
+ */
+
+export function unignorePA(pa_id) {
+    ignoredPA.delete(pa_id);
+}

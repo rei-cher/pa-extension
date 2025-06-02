@@ -16,6 +16,7 @@ import {
     initProcessedPA,
     ignorePA,
     isPAIgnored,
+    unignorePA,
 } from "../utils/storageUtils.js";
 
 import {
@@ -46,6 +47,9 @@ export async function handlePARequest({ url, source }) {
     initProcessedPA(pa_id);
     initDownloadTrigger(pa_id);
 
+    // Test - if pa was added to ignore list (to unignore)
+    // unignorePA(pa_id);
+
     // check if we should ignore it:
     if (isPAIgnored(pa_id)) {
         console.warn(`[PA ${pa_id}] Already ignored. Skipping.`);
@@ -69,15 +73,15 @@ export async function handlePARequest({ url, source }) {
         }
 
         // check custom skip logic
-        if (shouldSkipPA(pa_info)) {
-            console.log(`[PA ${pa_id}] Custom skip logic triggered. Ignoring forever.`);
-            ignorePA(pa_id);
-            return;
-        }
+        // if (shouldSkipPA(pa_info)) {
+        //     console.log(`[PA ${pa_id}] Custom skip logic triggered. Ignoring forever.`);
+        //     ignorePA(pa_id);
+        //     return;
+        // }
 
         // check terminal case
         const todayISO = getTodayISODate();
-        if (isTerminalCase(pa_info, url, todayISO)) {
+        if (isTerminalCase(pa_info, todayISO)) {
             console.log(`[PA ${pa_id}] Terminal case — skipping future.`, pa_info.request_outcome);
             ignorePA(pa_id);
             return;
@@ -175,6 +179,7 @@ export async function handlePARequest({ url, source }) {
 
     } catch (err) {
         console.error(`[PA ${pa_id}] Unexpected error in handler:`, err);
+        return;
     } finally {
         processingPA.delete(pa_id);
     }
@@ -214,10 +219,41 @@ async function logDownloadFallback(pa_id, pa_info) {
 function extractPAIdFromUrl(url) {
     try {
         const urlObj = new URL(url);
-        const parts = urlObj.pathname.split("/").filter(Boolean);
-        if (parts.includes("faxconfirmation") || parts.includes("requests")) {
-            return parts[parts.length - 1].split("?")[0];
+        const path = urlObj.pathname.toLowerCase();
+
+        const paIdPatterns = [
+            "/api/requests/",
+            "/request/faxconfirmation/"
+        ];
+
+        for (const pattern of paIdPatterns) {
+            const index = path.indexOf(pattern);
+            if (index !== -1) {
+                const segments = urlObj.pathname.split("/").filter(Boolean);
+                const patternParts = pattern.split("/").filter(Boolean);
+                const patternIndex = segments.findIndex(seg => seg.toLowerCase() === patternParts[patternParts.length - 1]);
+                
+                // PA ID is the next segment after the matched pattern
+                const paId = segments[patternIndex + 1];
+
+                const invalidIds = [
+                    "reminders",
+                    "history",
+                    "notes",
+                    "attachments",
+                    "dialog_views",
+                    "next_request"
+                ];
+
+                if (!invalidIds.includes(paId?.toLowerCase())) {
+                    console.log(`[extractPAIdFromUrl] Extracted PA ID: ${paId}`);
+                    return paId;
+                } else {
+                    return null;
+                }
+            }
         }
+
         return null;
     } catch (err) {
         console.error("Invalid URL in extractPAIdFromUrl:", url);

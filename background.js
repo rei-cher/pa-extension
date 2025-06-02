@@ -6,8 +6,8 @@ chrome.webRequest.onCompleted.addListener(
         const { url } = details;
         // If URL matches either “/api/requests/PA_ID” or “/request/faxconfirmation/PA_ID”
         if (
-            url.includes("/api/requests/") ||
-            url.includes("/request/faxconfirmation/")
+            (url.includes("/api/requests/") ||
+            url.includes("/request/faxconfirmation/"))
         ) {
             console.log(`[webRequest] Detected PA request for URL: ${url}`);
             await handlePARequest({ url, source: "webRequest" });
