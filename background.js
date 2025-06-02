@@ -213,7 +213,7 @@ async function handlePARequest(details) {
             ["Unknown", "Favorable", "Unfavorable"].includes(request_outcome) ||
             (workflow_status === "Sent to Plan" && !sent.includes(getTodayDay())) ||
             (epa_status_description?.includes("PA Request - Sent to Plan") && !sent?.includes(getTodayDay()) ) ||
-            epa_status_description.includes("Expired") ||
+            epa_status_description?.includes("Expired") ||
             ["is unable to respond with clinical questions", "is unable to retrieve the clinical questions"].some(str => status_dialog_loading.includes(str)) ||
             status_dialog_sending?.includes("You may close this dialog and return to your dashboard to perform other")
             
