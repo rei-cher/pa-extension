@@ -45,7 +45,7 @@ export async function handlePARequest({ url, source }) {
     // if it’s already in processing, skip
     // except if the source is a webNavigation
     // if webNavigation, then we want to proceed further and download
-    if (processingPA.has(pa_id) && !source === "webNavigation") return;
+    if (processingPA.has(pa_id) && source !== "webNavigation") return;
 
     // initialize in-memory tracking if first seen
     initProcessedPA(pa_id);
@@ -109,6 +109,10 @@ export async function handlePARequest({ url, source }) {
         // if we reach here, we want to download + optionally upload.
         const triggerDownloadObj = getDownloadTrigger(pa_id);
         const triggerCSVObj = getCSVTrigger(pa_id);
+
+        console.log("downloadTrigger:", triggerDownloadObj);
+        console.log("csvTrigger:", triggerCSVObj);
+
         if (triggerDownloadObj.triggered || triggerCSVObj.triggered) {
             console.log(`[PA ${pa_id}] [Source ${source}] Download or CSV already triggered once. Logging only.`);
             await logDownloadFallback(pa_id, pa_info);
@@ -158,9 +162,10 @@ export async function handlePARequest({ url, source }) {
             insurance: pa_info.insurance,
             patientId,
             npi: pa_info.npi,
-        });
+        }, source);
+        
         setCSVTriggered(pa_id);
-
+        
         // mark this PA as downloaded (both in-memory and in storage)
         await markPAAsDownloaded(pa_id);
 

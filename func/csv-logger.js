@@ -23,7 +23,8 @@ const CSV_HEADER = [
      * Append one new row of PA info to the CSV log and trigger a download.
      * @param {Object} paInfo – the object returned by getPAInfo()
 */
-export async function logPaDownload(paInfo) {
+export async function logPaDownload(paInfo, source) {
+    console.warn(`[logPaDownload] [${source}] logPaDownload called`)
     const {
         pa_id,
         patient_fname,
@@ -74,7 +75,13 @@ export async function logPaDownload(paInfo) {
     const updatedCsv = pa_csv_log + newRow;
 
     // Save back to storage
-    await chrome.storage.local.set({ [STORAGE_KEY]: updatedCsv });
+    try{
+        await chrome.storage.local.set({ [STORAGE_KEY]: updatedCsv });
+        console.warn(`[logPaDownload] [${source}] Row appended`)
+    }
+    catch (error) {
+        console.error("Failed to append a row: ", error);
+    }
 
     // Trigger download of the updated CSV
     await exportCsvLog(updatedCsv);
