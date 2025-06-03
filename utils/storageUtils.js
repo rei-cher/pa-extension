@@ -6,6 +6,7 @@ const PA_DOWNLOADED_KEYS = "downloaded_pa_keys";
 const processedPA = new Map();   // pa_id => { downloaded: boolean }
 const ignoredPA = new Set();     // pa_ids to permanently skip
 const downloadTrigger = new Map(); // pa_id => { triggered: boolean }
+const CSVTrigger = new Map(); // pa_id => {triggered: boolean}
 
 /**
     * fetch the “downloaded_pa_keys” object from chrome.storage.local.
@@ -54,6 +55,7 @@ export async function hasPADownloaded(pa_id) {
 export function initDownloadTrigger(pa_id) {
     if (!downloadTrigger.has(pa_id)) {
         downloadTrigger.set(pa_id, { triggered: false });
+        CSVTrigger.set(pa_id, {triggered: false})
     }
 }
 
@@ -61,11 +63,25 @@ export function getDownloadTrigger(pa_id) {
     return downloadTrigger.get(pa_id) || { triggered: false };
 }
 
+export function getCSVTrigger(pa_id) {
+    return CSVTrigger.get(pa_id) || {triggered: false};
+}
+
 export function setDownloadTriggered(pa_id) {
     if (!downloadTrigger.has(pa_id)) {
         downloadTrigger.set(pa_id, { triggered: true });
-    } else {
+    } 
+    else {
         downloadTrigger.get(pa_id).triggered = true;
+    }
+}
+
+export function setCSVTriggered(pa_id) {
+    if (!CSVTrigger.has(pa_id)) {
+        CSVTrigger.set(pa_id, {triggered: true});
+    }
+    else {
+        CSVTrigger.get(pa_id).triggered = true;
     }
 }
 

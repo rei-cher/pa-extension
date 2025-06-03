@@ -4,6 +4,10 @@
     * it was sent today, or URL explicitly contains “faxconfirmation”.
 */
 export function isUploadCase(pa_info, url, todayISO) {
+    if (url.includes("/faxconfirmation/")) {
+        return true;
+    }
+
     const {
         epa_status_description,
         sent = "",
@@ -12,9 +16,10 @@ export function isUploadCase(pa_info, url, todayISO) {
     const sentIncludesToday = sent?.includes(todayISO);
     const statusMatch =
         epa_status_description === "PA Request - Sent to Plan" && sentIncludesToday;
-    const urlMatch = url.includes("/faxconfirmation/");
 
-    return Boolean(statusMatch || urlMatch);
+    console.log("[isUploadCase] statusMatch:", statusMatch);
+
+    return Boolean(statusMatch);
 }
 
 /**
@@ -33,6 +38,7 @@ export function isTerminalCase(pa_info, todayISO) {
         status_dialog_loading = "",
         status_dialog_sending = "",
         sent = "",
+        extra_info = ""
     } = pa_info;
 
     const outcomeMatch = ["Unknown", "Favorable", "Unfavorable"].includes(request_outcome);
@@ -46,14 +52,16 @@ export function isTerminalCase(pa_info, todayISO) {
     const unableSending = status_dialog_sending?.includes(
         "You may close this dialog and return to your dashboard to perform other"
     );
+    const terminalExtraInfo = extra_info?.includes("was previously approved");
 
-    console.log(`[teminal case outcome]\noutcomeMatch - ${outcomeMatch}\nworkflowStale - ${workflowStale}\nexpired - ${expired}\nunableLoading - ${unableLoading}\nunableSending - ${unableSending}\ntodayISO - ${todayISO}`)
+    console.log(`[teminal case outcome]\noutcomeMatch - ${outcomeMatch}\nworkflowStale - ${workflowStale}\nexpired - ${expired}\nunableLoading - ${unableLoading}\nunableSending - ${unableSending}\ntodayISO - ${todayISO}\nterminalExtraInfo - ${terminalExtraInfo}`);
 
     return Boolean(
         outcomeMatch ||
         workflowStale ||
         expired ||
         unableLoading ||
-        unableSending
+        unableSending ||
+        terminalExtraInfo
     );
 }

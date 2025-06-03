@@ -17,6 +17,8 @@ import {
     ignorePA,
     isPAIgnored,
     unignorePA,
+    setCSVTriggered,
+    getCSVTrigger,
 } from "../utils/storageUtils.js";
 
 import {
@@ -37,11 +39,13 @@ export async function handlePARequest({ url, source }) {
     console.log("=============\nDetails:\n", { url, source }, "\n=============");
 
     // 1extract pa_id immediately
-    const pa_id = extractPAIdFromUrl(url);
+    const pa_id = extractPAIdFromUrl(url, source);
     if (!pa_id) return;
 
     // if it’s already in processing, skip
-    if (processingPA.has(pa_id)) return;
+    // except if the source is a webNavigation
+    // if webNavigation, then we want to proceed further and download
+    if (processingPA.has(pa_id) && !source === "webNavigation") return;
 
     // initialize in-memory tracking if first seen
     initProcessedPA(pa_id);
@@ -52,25 +56,27 @@ export async function handlePARequest({ url, source }) {
 
     // check if we should ignore it:
     if (isPAIgnored(pa_id)) {
-        console.warn(`[PA ${pa_id}] Already ignored. Skipping.`);
+        console.warn(`[PA ${pa_id}] [Source ${source}] Already ignored. Skipping.`);
         return;
     }
 
     // check persistent storage: if already downloaded → skip
     if (await hasPADownloaded(pa_id)) {
-        console.warn(`[PA ${pa_id}] Already downloaded (in storage). Skipping.`);
+        console.warn(`[PA ${pa_id}] [Source ${source}] Already downloaded (in storage). Skipping.`);
         return;
     }
 
     processingPA.add(pa_id);
     try {
         // fetch full PA info
-        const pa_info = await getPAInfo(pa_id);
+        const pa_info = await getPAInfo(pa_id, source);
         if (!pa_info) {
-            console.error(`[PA ${pa_id}] Failed to fetch pa_info.`);
+            console.error(`[PA ${pa_id}] [Source ${source}] Failed to fetch pa_info.`);
             processingPA.delete(pa_id);
             return;
         }
+
+        console.log('[paHandler] Extracted pa info: ', pa_info);
 
         // check custom skip logic
         // if (shouldSkipPA(pa_info)) {
@@ -82,17 +88,18 @@ export async function handlePARequest({ url, source }) {
         // check terminal case
         const todayISO = getTodayISODate();
         if (isTerminalCase(pa_info, todayISO)) {
-            console.log(`[PA ${pa_id}] Terminal case — skipping future.`, pa_info.request_outcome);
+            console.log(`[PA ${pa_id}] [Source ${source}] Terminal case — skipping future.`, pa_info.request_outcome);
             ignorePA(pa_id);
             return;
         }
 
         // decide if this is an “upload case”:
         const uploadCase = isUploadCase(pa_info, url, todayISO);
+        console.log(`[paHandler] [Source - ${source}] uploadCase - ${uploadCase}`);
 
         // if not an uploadCase, do nothing.
         if (!uploadCase) {
-            console.log(`[PA ${pa_id}] Not an upload case. State:`, {
+            console.log(`[PA ${pa_id}] [Source ${source}] Not an upload case. State:`, {
                 epa_status: pa_info.epa_status,
                 workflow_status: pa_info.workflow_status,
             });
@@ -100,16 +107,17 @@ export async function handlePARequest({ url, source }) {
         }
 
         // if we reach here, we want to download + optionally upload.
-        const triggerObj = getDownloadTrigger(pa_id);
-        if (triggerObj.triggered) {
-            console.log(`[PA ${pa_id}] Download already triggered once. Logging only.`);
+        const triggerDownloadObj = getDownloadTrigger(pa_id);
+        const triggerCSVObj = getCSVTrigger(pa_id);
+        if (triggerDownloadObj.triggered || triggerCSVObj.triggered) {
+            console.log(`[PA ${pa_id}] [Source ${source}] Download or CSV already triggered once. Logging only.`);
             await logDownloadFallback(pa_id, pa_info);
             await markPAAsDownloaded(pa_id);
             return;
         }
 
         // perform the download:
-        console.log(`[PA ${pa_id}] Initiating download...`);
+        console.log(`[PA ${pa_id}] [Source ${source}] Initiating download...`);
         const downloadId = await downloadPA(
             pa_id,
             pa_info.patient_fname,
@@ -119,7 +127,7 @@ export async function handlePARequest({ url, source }) {
         setDownloadTriggered(pa_id);
 
         const filepath = await waitForDownloadFilename(downloadId);
-        console.log(`[PA ${pa_id}] Downloaded to:`, filepath);
+        console.log(`[PA ${pa_id}] [Source ${source}] Downloaded to:`, filepath);
 
         // attempt to find EMA patient:
         const matches = await findEmaPatient(
@@ -132,13 +140,14 @@ export async function handlePARequest({ url, source }) {
         let patientId = "";
         if (matches && matches.length > 0) {
             patientId = matches[0].id;
-            console.log(`[PA ${pa_id}] Found EMA patient ID=${patientId}. Uploading...`);
+            console.log(`[PA ${pa_id}] [Source ${source}] Found EMA patient ID=${patientId}. Uploading...`);
         } 
         else {
-            console.log(`[PA ${pa_id}] No EMA patient match found. Logging with empty patientId.`);
+            console.log(`[PA ${pa_id}] [Source ${source}] No EMA patient match found. Logging with empty patientId.`);
         }
 
         // log to CSV (regardless of upload success)
+        console.log(`[PA ${pa_id}] [Source ${source}] Initiating csv download...`)
         await logPaDownload({
             pa_id,
             patient_fname: pa_info.patient_fname,
@@ -150,6 +159,7 @@ export async function handlePARequest({ url, source }) {
             patientId,
             npi: pa_info.npi,
         });
+        setCSVTriggered(pa_id);
 
         // mark this PA as downloaded (both in-memory and in storage)
         await markPAAsDownloaded(pa_id);
@@ -159,9 +169,9 @@ export async function handlePARequest({ url, source }) {
         if (patientId) {
         try {
             const tabs = await chrome.tabs.query({});
-            const emaTab = tabs.find((t) => t.url?.includes("ema.md"));
+            const emaTab = tabs.find((tab) => tab.url?.includes("ema.md"));
             if (emaTab) {
-            console.log(`[PA ${pa_id}] Uploading PDF to EMA tab #${emaTab.id}...`);
+            console.log(`[PA ${pa_id}] [Source ${source}] Uploading PDF to EMA tab #${emaTab.id}...`);
             // (Example sketch; uncomment & fill in if needed)
             // const fileObj = await fetchPDFasFile(pa_id, filepath);
             // const dtoList = [{
@@ -173,12 +183,12 @@ export async function handlePARequest({ url, source }) {
             // await uploadPdf(emaTab.id, dtoList, fileObj);
             }
         } catch (tabErr) {
-            console.error(`[PA ${pa_id}] Error finding/uploading to EMA tab:`, tabErr);
+            console.error(`[PA ${pa_id}] [Source ${source}] Error finding/uploading to EMA tab:`, tabErr);
         }
         }
 
     } catch (err) {
-        console.error(`[PA ${pa_id}] Unexpected error in handler:`, err);
+        console.error(`[PA ${pa_id}] [Source ${source}] Unexpected error in handler:`, err);
         return;
     } finally {
         processingPA.delete(pa_id);
@@ -216,7 +226,7 @@ async function logDownloadFallback(pa_id, pa_info) {
 /**
     * reuse the same URL-to-ID logic instead of duplicating in background.js
 */
-function extractPAIdFromUrl(url) {
+function extractPAIdFromUrl(url, source) {
     try {
         const urlObj = new URL(url);
         const path = urlObj.pathname.toLowerCase();
@@ -246,7 +256,7 @@ function extractPAIdFromUrl(url) {
                 ];
 
                 if (!invalidIds.includes(paId?.toLowerCase())) {
-                    console.log(`[extractPAIdFromUrl] Extracted PA ID: ${paId}`);
+                    console.log(`[extractPAIdFromUrl] [Source ${source}] Extracted PA ID: ${paId}`);
                     return paId;
                 } else {
                     return null;
