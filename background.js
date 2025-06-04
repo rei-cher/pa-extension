@@ -120,33 +120,31 @@ async function handlePARequest(details) {
     
                 // Save it back to storage
                 await chrome.storage.local.set({ [PA_DONWLOADED_KEYS]: downloaded_pa_keys });
+            }
+            else {
+                const temp_pt_id = "";
+                await logPaDownload({ 
+                    pa_id, 
+                    patient_fname, 
+                    patient_lname, 
+                    patient_dob, 
+                    drug, 
+                    submitted_by,
+                    insurance,
+                    temp_pt_id,
+                    npi
+                });
+                
+                // Mark as downloaded
+                processedPA.get(pa_id).downloaded = true;
+    
+                // Add the new pa_id
+                downloaded_pa_keys[pa_id] = true;
+    
+                // Save it back to storage
+                await chrome.storage.local.set({ [PA_DONWLOADED_KEYS]: downloaded_pa_keys });
+            }
         }
-
-        }
-        else {
-            const temp_pt_id = "";
-            await logPaDownload({ 
-                pa_id, 
-                patient_fname, 
-                patient_lname, 
-                patient_dob, 
-                drug, 
-                submitted_by,
-                insurance,
-                temp_pt_id,
-                npi
-            });
-            
-            // Mark as downloaded
-            processedPA.get(pa_id).downloaded = true;
-
-            // Add the new pa_id
-            downloaded_pa_keys[pa_id] = true;
-
-            // Save it back to storage
-            await chrome.storage.local.set({ [PA_DONWLOADED_KEYS]: downloaded_pa_keys });
-        }
-
         return;
     }
 
