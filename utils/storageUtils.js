@@ -68,6 +68,7 @@ export function getCSVTrigger(pa_id) {
 }
 
 export function setDownloadTriggered(pa_id) {
+    console.warn(`[setDownloadTriggered] setDownloadTriggered - triggered`)
     if (!downloadTrigger.has(pa_id)) {
         downloadTrigger.set(pa_id, { triggered: true });
     } 
@@ -77,6 +78,7 @@ export function setDownloadTriggered(pa_id) {
 }
 
 export function setCSVTriggered(pa_id) {
+    console.warn(`[setCSVTriggered] setCSVTriggered - triggered`)
     if (!CSVTrigger.has(pa_id)) {
         CSVTrigger.set(pa_id, {triggered: true});
     }

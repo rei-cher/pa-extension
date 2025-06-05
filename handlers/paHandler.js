@@ -134,77 +134,80 @@ export async function handlePARequest({ url, source }) {
         const filepath = await waitForDownloadFilename(downloadId);
         console.log(`[PA ${pa_id}] [Source ${source}] Downloaded to:`, filepath);
 
-        // attempt to find EMA patient:
-        const matches = await findEmaPatient(
-            pa_info.patient_dob,
-            pa_info.patient_fname,
-            pa_info.patient_lname
-        );
-
-        // if found, upload; if not, still log (temp_pt_id = "")
-        let patientId = "";
-        if (matches && matches.length > 0) {
-            patientId = matches[0].id;
-            console.log(`[PA ${pa_id}] [Source ${source}] Found EMA patient ID=${patientId}. Uploading...`);
-        } 
-        else {
-            console.log(`[PA ${pa_id}] [Source ${source}] No EMA patient match found. Logging with empty patientId.`);
-        }
-
-        // log to CSV (regardless of upload success)
-        console.log(`[PA ${pa_id}] [Source ${source}] Initiating csv download...`)
-        await logPaDownload({
-            pa_id,
-            patient_fname: pa_info.patient_fname,
-            patient_lname: pa_info.patient_lname,
-            patient_dob: pa_info.patient_dob,
-            drug: pa_info.drug,
-            submitted_by: pa_info.submitted_by,
-            insurance: pa_info.insurance,
-            patientId,
-            npi: pa_info.npi,
-        }, source);
-
-        await uploadPaToDb({
-            pa_id,
-            patient_fname: pa_info.patient_fname,
-            patient_lname: pa_info.patient_lname,
-            patient_dob: pa_info.patient_dob,
-            drug: pa_info.drug,
-            submitted_by: pa_info.submitted_by,
-            insurance: pa_info.insurance,
-            patientId,
-            npi: pa_info.npi,
-        }, source)
-        
-        setCSVTriggered(pa_id);
-        
-        // mark this PA as downloaded (both in-memory and in storage)
-        await markPAAsDownloaded(pa_id);
-
-        // try to upload to EMA tab if open
-        // TODO: find a way to upload (current idea is to use selenium)
-        if (patientId) {
-        try {
-            const tabs = await chrome.tabs.query({});
-            const emaTab = tabs.find((tab) => tab.url?.includes("ema.md"));
-            if (emaTab) {
-            console.log(`[PA ${pa_id}] [Source ${source}] Uploading PDF to EMA tab #${emaTab.id}...`);
-            // (Example sketch; uncomment & fill in if needed)
-            // const fileObj = await fetchPDFasFile(pa_id, filepath);
-            // const dtoList = [{
-            //   patient: { id: String(patientId), lastName: pa_info.patient_lname, firstName: pa_info.patient_fname },
-            //   additionalInfo: { performedDate: new Date().toISOString() },
-            //   fileName: fileObj.name,
-            //   title: `${pa_info.drug} PA submitted: ${new Date().toLocaleDateString()}`,
-            // }];
-            // await uploadPdf(emaTab.id, dtoList, fileObj);
+        if (filepath) {
+            // attempt to find EMA patient:
+            const matches = await findEmaPatient(
+                pa_info.patient_dob,
+                pa_info.patient_fname,
+                pa_info.patient_lname
+            );
+    
+            // if found, upload; if not, still log (temp_pt_id = "")
+            let patientId = "";
+            if (matches && matches.length > 0) {
+                patientId = matches[0].id;
+                console.log(`[PA ${pa_id}] [Source ${source}] Found EMA patient ID=${patientId}. Uploading...`);
             }
-        } catch (tabErr) {
-            console.error(`[PA ${pa_id}] [Source ${source}] Error finding/uploading to EMA tab:`, tabErr);
+            else {
+                console.log(`[PA ${pa_id}] [Source ${source}] No EMA patient match found. Logging with empty patientId.`);
+            }
+    
+            // log to CSV (regardless of upload success)
+            console.log(`[PA ${pa_id}] [Source ${source}] Initiating csv download...`)
+            await logPaDownload({
+                pa_id,
+                patient_fname: pa_info.patient_fname,
+                patient_lname: pa_info.patient_lname,
+                patient_dob: pa_info.patient_dob,
+                drug: pa_info.drug,
+                submitted_by: pa_info.submitted_by,
+                insurance: pa_info.insurance,
+                patientId,
+                npi: pa_info.npi,
+            }, source);
+    
+            setCSVTriggered(pa_id);
+            console.log(`[paHandle] ==== CSV Trigger: ${getCSVTrigger(pa_id)}`)
+    
+            await uploadPaToDb({
+                pa_id,
+                patient_fname: pa_info.patient_fname,
+                patient_lname: pa_info.patient_lname,
+                patient_dob: pa_info.patient_dob,
+                drug: pa_info.drug,
+                submitted_by: pa_info.submitted_by,
+                insurance: pa_info.insurance,
+                patientId,
+                npi: pa_info.npi,
+            }, source)
+    
+    
+            // mark this PA as downloaded (both in-memory and in storage)
+            await markPAAsDownloaded(pa_id);
+    
+            // try to upload to EMA tab if open
+            // TODO: find a way to upload (current idea is to use selenium)
+            if (patientId) {
+                try {
+                    const tabs = await chrome.tabs.query({});
+                    const emaTab = tabs.find((tab) => tab.url?.includes("ema.md"));
+                    if (emaTab) {
+                        console.log(`[PA ${pa_id}] [Source ${source}] Uploading PDF to EMA tab #${emaTab.id}...`);
+                        // (Example sketch; uncomment & fill in if needed)
+                        // const fileObj = await fetchPDFasFile(pa_id, filepath);
+                        // const dtoList = [{
+                        //   patient: { id: String(patientId), lastName: pa_info.patient_lname, firstName: pa_info.patient_fname },
+                        //   additionalInfo: { performedDate: new Date().toISOString() },
+                        //   fileName: fileObj.name,
+                        //   title: `${pa_info.drug} PA submitted: ${new Date().toLocaleDateString()}`,
+                        // }];
+                        // await uploadPdf(emaTab.id, dtoList, fileObj);
+                    }
+                } catch (tabErr) {
+                    console.error(`[PA ${pa_id}] [Source ${source}] Error finding/uploading to EMA tab:`, tabErr);
+                }
+            }
         }
-        }
-
     } catch (err) {
         console.error(`[PA ${pa_id}] [Source ${source}] Unexpected error in handler:`, err);
         return;
@@ -260,7 +263,7 @@ function extractPAIdFromUrl(url, source) {
                 const segments = urlObj.pathname.split("/").filter(Boolean);
                 const patternParts = pattern.split("/").filter(Boolean);
                 const patternIndex = segments.findIndex(seg => seg.toLowerCase() === patternParts[patternParts.length - 1]);
-                
+
                 // PA ID is the next segment after the matched pattern
                 const paId = segments[patternIndex + 1];
 
