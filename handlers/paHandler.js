@@ -27,6 +27,7 @@ import {
 } from "../utils/statusUtils.js";
 
 import { shouldSkipPA } from "../utils/skipUtils.js";
+import { uploadPaToDb } from "../func/pa-db-upload.js";
 
 // in-memory set to prevent parallel processing on the same PA
 const processingPA = new Set();
@@ -163,6 +164,18 @@ export async function handlePARequest({ url, source }) {
             patientId,
             npi: pa_info.npi,
         }, source);
+
+        await uploadPaToDb({
+            pa_id,
+            patient_fname: pa_info.patient_fname,
+            patient_lname: pa_info.patient_lname,
+            patient_dob: pa_info.patient_dob,
+            drug: pa_info.drug,
+            submitted_by: pa_info.submitted_by,
+            insurance: pa_info.insurance,
+            patientId,
+            npi: pa_info.npi,
+        }, source)
         
         setCSVTriggered(pa_id);
         
