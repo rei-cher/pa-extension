@@ -80,6 +80,7 @@ export async function getPAInfo(pa_id, source) {
             patient_lname: data.patient_lname,
             patient_dob: extractPatientDOB(data),
             drug: data.drug.split(' ')[0],
+            full_drug_name: data.drug,
             submitted_by: data.submitted_by,
             epa_status: data.ePA_Status,
             epa_status_description: data.ePA_Status_description,

@@ -116,7 +116,7 @@ export async function handlePARequest({ url, source }) {
 
         if (triggerDownloadObj.triggered || triggerCSVObj.triggered) {
             console.log(`[PA ${pa_id}] [Source ${source}] Download or CSV already triggered once. Logging only.`);
-            await logDownloadFallback(pa_id, pa_info);
+            // await logDownloadFallback(pa_id, pa_info);
             await markPAAsDownloaded(pa_id);
             return;
         }
@@ -159,7 +159,7 @@ export async function handlePARequest({ url, source }) {
                 patient_fname: pa_info.patient_fname,
                 patient_lname: pa_info.patient_lname,
                 patient_dob: pa_info.patient_dob,
-                drug: pa_info.drug,
+                drug: pa_info.full_drug_name,
                 submitted_by: pa_info.submitted_by,
                 insurance: pa_info.insurance,
                 patientId,
@@ -174,7 +174,7 @@ export async function handlePARequest({ url, source }) {
                 patient_fname: pa_info.patient_fname,
                 patient_lname: pa_info.patient_lname,
                 patient_dob: pa_info.patient_dob,
-                drug: pa_info.drug,
+                drug: pa_info.full_drug_name,
                 submitted_by: pa_info.submitted_by,
                 insurance: pa_info.insurance,
                 patientId,
@@ -207,6 +207,8 @@ export async function handlePARequest({ url, source }) {
                     console.error(`[PA ${pa_id}] [Source ${source}] Error finding/uploading to EMA tab:`, tabErr);
                 }
             }
+
+            processingPA.delete(pa_id);
         }
     } catch (err) {
         console.error(`[PA ${pa_id}] [Source ${source}] Unexpected error in handler:`, err);
