@@ -98,7 +98,7 @@ export async function getPAInfo(pa_id, source) {
 
     }
     catch (error) {
-        console.error('Error fetching PA info:', error);
+        console.log('Error fetching PA info:', error);
         return;
     }
 }

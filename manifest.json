@@ -10,7 +10,8 @@
         "identity",
         "downloads",
         "webRequest",
-        "webNavigation"
+        "webNavigation",
+        "webRequestBlocking"
     ],
     "host_permissions": [
         "*://portal-services.covermymeds.com/*",

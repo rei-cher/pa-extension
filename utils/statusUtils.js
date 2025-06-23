@@ -8,6 +8,14 @@ export function isUploadCase(pa_info, url, todayISO) {
         return true;
     }
 
+    if (url.includes("/plan-fax-confirmation")) {
+        return true;
+    }
+
+    if (url.includes("/fax/submit")) {
+        return true;
+    }
+
     const {
         epa_status_description,
         sent = "",

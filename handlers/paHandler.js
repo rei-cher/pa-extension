@@ -46,7 +46,7 @@ export async function handlePARequest({ url, source }) {
     // if it’s already in processing, skip
     // except if the source is a webNavigation
     // if webNavigation, then we want to proceed further and download
-    if (processingPA.has(pa_id) && source !== "webNavigation") return;
+    if (processingPA.has(pa_id) && !(source === "webNavigation" || source === "historyStateUpdated")) return;
 
     // initialize in-memory tracking if first seen
     initProcessedPA(pa_id);
@@ -72,7 +72,7 @@ export async function handlePARequest({ url, source }) {
         // fetch full PA info
         const pa_info = await getPAInfo(pa_id, source);
         if (!pa_info) {
-            console.error(`[PA ${pa_id}] [Source ${source}] Failed to fetch pa_info.`);
+            console.log(`[PA ${pa_id}] [Source ${source}] Failed to fetch pa_info.`);
             processingPA.delete(pa_id);
             return;
         }
@@ -252,11 +252,12 @@ async function logDownloadFallback(pa_id, pa_info) {
 function extractPAIdFromUrl(url, source) {
     try {
         const urlObj = new URL(url);
-        const path = urlObj.pathname.toLowerCase();
+        const path = urlObj.pathname?.toLowerCase();
 
         const paIdPatterns = [
             "/api/requests/",
-            "/request/faxconfirmation/"
+            "/request/faxconfirmation/",
+            "/v2/requests/"
         ];
 
         for (const pattern of paIdPatterns) {
