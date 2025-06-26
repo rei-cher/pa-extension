@@ -13,7 +13,7 @@ export async function uploadPaToDb(pa_info, souce) {
         npi
     } = pa_info;
 
-    fetch('http://127.0.0.1:5000/api/insert/', {
+    fetch('http://127.0.0.1:5000/api/pa_info/insert/', {
         method: 'POST',
         credentials: "include",
         headers: {
