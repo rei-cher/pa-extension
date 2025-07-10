@@ -66,3 +66,38 @@ chrome.webNavigation.onCompleted.addListener(
         frameId: 0,
     }
 );
+
+function scheduleMidnightAlarm() {
+    chrome.alarms.get('midnightCleanup', (existing) => {
+        if (!existing) {
+            const now = new Date();
+            const nextMidnight = new Date(now);
+            nextMidnight.setHours(0, 5, 0, 0);
+            if (now >= nextMidnight) {
+                nextMidnight.setDate(nextMidnight.getDate() + 1);
+            }
+            const delayInMinutes = (nextMidnight.getTime() - now.getTime()) / (1000 * 60);
+            chrome.alarms.create('midnightCleanup', {
+                delayInMinutes,
+                periodInMinutes: 24 * 60,
+            });
+        }
+    });
+}
+
+chrome.runtime.onInstalled.addListener(() => {
+    scheduleMidnightAlarm();
+});
+
+chrome.runtime.onStartup.addListener(() => {
+    scheduleMidnightAlarm();
+});
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === 'midnightCleanup') {
+        chrome.storage.local.remove('pa_csv_log', () => {
+            chrome.storage.local.set({ lastSavedDate: new Date().toDateString() });
+            console.log('Cleaned pa_csv_log at midnight.');
+        });
+    }
+});

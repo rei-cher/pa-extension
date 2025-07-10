@@ -114,12 +114,18 @@ export async function exportCsvLog(csvString) {
     const { pa_csv_log = CSV_HEADER } = await chrome.storage.local.get(STORAGE_KEY);
     const content = csvString || pa_csv_log;
 
+    // Get today's date in mm-dd-yyyy format
+    const today = new Date();
+    const formattedDate = today.toLocaleDateString('en-US').replace(/\//g, '-'); // Format as mm-dd-yyyy
+
     // Encode as URI component to create a data URL
     const dataUrl = 'data:text/csv;charset=utf-8,' + encodeURIComponent(content);
 
+    const filename = `pa_log_${formattedDate}.csv`;
+
     chrome.downloads.download({
         url: dataUrl,
-        filename: 'pa_log_test.csv',
+        filename: filename,
         conflictAction: 'overwrite',
         saveAs: false
     }, downloadId => {
